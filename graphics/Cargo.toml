@@ -1,0 +1,24 @@
+[package]
+name = "graphics"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+image = "0.23"
+winit = "0.26"
+cgmath = "0.18"
+env_logger = "0.9"
+log = "0.4"
+wgpu = { version = "*", features = ["trace"] }
+pollster = "0.2"
+bytemuck = {version = "1.4", features = [ "derive" ]}
+tobj = "3.0"
+anyhow = "1.0"
+rayon = "*"
+rand = "*"
+chrono = "*"
+futures = "*"
+wgpu_glyph = "*"
+serde = "*"

@@ -1,0 +1,31 @@
+[package]
+name = "sundile_core"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = "*"
+wgpu = "*"
+bytemuck = "*"
+cgmath = "*"
+futures = "*"
+anyhow = "*"
+
+chrono = "*"
+
+noise = "*"
+rand = "*"
+
+legion = "*"
+
+egui = "0.16"
+egui_wgpu_backend = "0.16"
+egui_winit_platform = "0.13"
+epi = "0.16"
+
+wgpu_glyph = "0.16.0"
+
+graphics = {path = "../graphics/"}
+assets = { path = "../assets/" }

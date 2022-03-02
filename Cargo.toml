@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "assets",
+    "graphics",
+    "sundile_core",
+]
