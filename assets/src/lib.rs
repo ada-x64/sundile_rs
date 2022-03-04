@@ -40,6 +40,6 @@ pub fn build() -> Result<()> {
     Ok(())
 }
 
-pub fn load(bin: &[u8], render_target: &sundile_graphics::render_target::RenderTarget) -> Assets {
+pub fn parse(bin: &[u8], render_target: &sundile_graphics::render_target::RenderTarget) -> Assets {
     bincode::deserialize::<AssetsData>(bin).unwrap().parse(&render_target).unwrap()
 }

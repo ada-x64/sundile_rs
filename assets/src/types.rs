@@ -71,6 +71,7 @@ pub struct AssetsData {
     pub fonts: AssetMap,
 }
 
+//TODO: add impl to check if asset exists, possibly load default value if none found
 pub struct Assets {
     pub shaders: shader::EmbeddedMap,
     pub textures: AssetMap,

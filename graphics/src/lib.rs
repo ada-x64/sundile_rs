@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 pub mod camera;
-pub mod model;
 pub mod texture;
+pub mod model;
 pub mod instance;
 pub mod light;
 pub mod render_target;
@@ -12,8 +12,8 @@ pub mod prelude {
     pub use crate::{
         *,
         camera::*,
-        model::*,
         texture::*,
+        model::*,
         instance::*,
         light::*,
         render_target::*,

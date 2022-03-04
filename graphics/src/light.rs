@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 use wgpu::*;
 
-pub const NUM_LIGHTS: usize = 10;
+pub const NUM_LIGHTS: usize = 4;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -73,18 +73,6 @@ impl LightWrapper {
     }
     /// Gets the current light bind group and clears the light uniforms for this pass.
     pub fn get_bind_group(&mut self, device: &wgpu::Device) -> BindGroup {
-        // let mut buffers = vec![];
-        // for i in 0..NUM_LIGHTS {
-        //     buffers.push(device.create_buffer_init(
-        //         &util::BufferInitDescriptor {
-        //             label: Some(format!("Light VB {}", i).as_str()),
-        //             contents: bytemuck::cast_slice(&[self.lights[i]]),
-        //             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        //         }
-        //     ));
-        //     self.lights[i] = LightUniform::default();
-        // }
-
         let buffer = device.create_buffer_init(
             &util::BufferInitDescriptor {
                 label: Some(format!("Lights Buffer").as_str()),

@@ -1,6 +1,7 @@
 use std::time::*;
 use legion::*;
 use sundile_graphics::prelude::*;
+use sundile_assets::prelude::*;
 
 use crate::renderer::*;
 use crate::renderer2d::*;
@@ -14,14 +15,12 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
-    pub fn new(render_target: &RenderTarget, bin: &[u8], viewport: Option<Viewport>) -> Self  {
-        let assets = sundile_assets::load(bin, render_target);
-
+    pub fn new(render_target: &RenderTarget, assets: &Assets, viewport: Option<Viewport>) -> Self  {
         let renderer = Renderer::new(&render_target, &assets, viewport);
         let renderer2d = Renderer2d::new(&render_target, &assets,);
 
-        let mut resources = Resources::default();
-        resources.insert(assets);
+        let resources = Resources::default();
+        // resources.insert(assets); // Don't send the entire assets struct here. Probably should access assets via some api.
         
         Game {
             renderer,
@@ -37,8 +36,8 @@ impl<'a> Game<'a> {
         self.schedule.execute(&mut self.world, &mut self.resources,);
     }
 
-    pub fn render(&mut self, render_target: &mut RenderTarget,) {
-        self.renderer.render(render_target, &self.world);
+    pub fn render(&mut self, render_target: &mut RenderTarget, assets: &Assets) {
+        self.renderer.render(render_target, &self.world, assets);
         self.renderer2d.render(render_target);
     }
 

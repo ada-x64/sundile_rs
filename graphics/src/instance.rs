@@ -1,4 +1,5 @@
-use crate::Vertex;
+use crate::prelude::*;
+use wgpu::util::*;
 pub struct Instance {
 	pub position: cgmath::Vector3<f32>,
 	pub rotation: cgmath::Quaternion<f32>,
@@ -67,4 +68,58 @@ impl Vertex for InstanceRaw {
 			],
 		}
 	}
+}
+
+pub struct InstanceCache {
+    instances: Vec<Instance>,
+    buffer: Option<wgpu::Buffer>,
+    stale: bool,
+}
+
+impl InstanceCache {
+    pub fn new() -> Self {
+        Self {
+            instances: vec![],
+            buffer: None,
+            stale: true,
+            // ranges: vec![],
+        }
+    }
+
+    pub fn insert(&mut self, instance: Instance) {
+        self.stale = false;
+        self.instances.push(instance);
+    }
+
+    pub fn clear(&mut self) {
+        self.stale = false;
+        self.instances.clear();
+    }
+
+    pub fn update(&mut self, device: &wgpu::Device) {
+        if !self.stale {
+            self.buffer = Some(device.create_buffer_init(&BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>()),
+                usage: wgpu::BufferUsages::VERTEX,
+            }));
+        }
+        self.stale = true;
+    }
+
+    pub fn set_ranges(&mut self) {
+        // This should allow you to set which instances to render.
+        // Possibly add helpers for all, none
+        todo!() 
+    }
+
+    pub fn render<'r>(&'r mut self,
+        render_pass: &mut wgpu::RenderPass<'r>,
+        model: &'r Model,
+        camera_bind_group: &'r wgpu::BindGroup,
+        light_bind_group: &'r wgpu::BindGroup,
+    ) {
+        render_pass.set_vertex_buffer(1, self.buffer.as_ref().unwrap().slice(..));
+        render_pass.draw_model_instanced(model, 0..self.instances.len() as u32, &camera_bind_group, &light_bind_group);
+    }
 }

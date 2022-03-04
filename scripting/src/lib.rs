@@ -1,8 +1,15 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+use legion::*;
+
+pub mod components;
+pub mod example_scene;
+
+pub trait Component : 'static + Sized + Send + Sync {}
+
+pub struct Scene {
+    entities: Vec<Box<dyn Component>>
+}
+impl Scene {
+    pub fn load(&self, world: &legion::World) {
+        
     }
 }

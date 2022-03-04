@@ -23,8 +23,10 @@ pub fn run(bin: &[u8]) {
 
     let mut render_target = futures::executor::block_on(RenderTarget::new(&window, false, Some("Renderer")));
 
+    let assets = sundile_assets::parse(bin, &render_target);
+
     let mut gui = debug_gui::DebugGui::new(&render_target, &window);
-    let mut game = game::Game::new(&render_target, bin, None);
+    let mut game = game::Game::new(&render_target, &assets, None);
     game.init_scene(0);
 
     let mut view_debug_gui = false;
@@ -50,7 +52,7 @@ pub fn run(bin: &[u8]) {
                 
                 render_target.begin_frame();
                 //TODO: Thread this process
-                game.render(&mut render_target,);
+                game.render(&mut render_target, &assets);
                 if view_debug_gui {
                     gui.render(&mut render_target, &window, &game);
                 }
