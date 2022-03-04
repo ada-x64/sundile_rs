@@ -36,7 +36,7 @@ impl RenderTarget {
 
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
-                features: wgpu::Features::empty(),
+                features: wgpu::Features::SPIRV_SHADER_PASSTHROUGH,
                 limits: wgpu::Limits::default(),
                 label: label,
             },

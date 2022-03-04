@@ -1,6 +1,6 @@
 use std::time::*;
 use legion::*;
-use graphics::prelude::*;
+use sundile_graphics::prelude::*;
 
 use crate::renderer::*;
 use crate::renderer2d::*;
@@ -14,9 +14,8 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
-    pub fn new<F>(render_target: &RenderTarget, viewport: Option<Viewport>, systems_fn: F) -> Self
-        where F: Fn() -> Schedule {
-        let assets = assets::load_from_bin(&render_target).expect("Unable to load assets!");
+    pub fn new(render_target: &RenderTarget, bin: &[u8], viewport: Option<Viewport>) -> Self  {
+        let assets = sundile_assets::load(bin, render_target);
 
         let renderer = Renderer::new(&render_target, &assets, viewport);
         let renderer2d = Renderer2d::new(&render_target, &assets,);
@@ -28,7 +27,7 @@ impl<'a> Game<'a> {
             renderer,
             renderer2d,
             world: World::default(),
-            schedule: systems_fn(),
+            schedule: Schedule::builder().build(), //TODO: Replace this with an actual script.
             resources,
         }
     }

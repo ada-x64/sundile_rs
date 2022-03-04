@@ -1,15 +1,15 @@
-pub mod game;
-pub mod renderer;
-pub mod renderer2d;
-pub mod debug_gui;
+mod debug_gui;
+mod game;
+// mod input;
+mod renderer;
+mod renderer2d;
 
-use legion::Schedule;
 use winit::{event::*, event_loop::*, window::*};
 use std::time::*;
 
-use graphics::prelude::*;
+use sundile_graphics::prelude::*;
 
-pub fn run<F>(systems_fn: F) -> () where F: Fn() -> Schedule {
+pub fn run(bin: &[u8]) {
     println!("===\n=== RUN AT {:?}\n===", chrono::Local::now());
 
     let event_loop = EventLoop::new();
@@ -24,7 +24,7 @@ pub fn run<F>(systems_fn: F) -> () where F: Fn() -> Schedule {
     let mut render_target = futures::executor::block_on(RenderTarget::new(&window, false, Some("Renderer")));
 
     let mut gui = debug_gui::DebugGui::new(&render_target, &window);
-    let mut game = game::Game::new(&render_target, None, systems_fn);
+    let mut game = game::Game::new(&render_target, bin, None);
     game.init_scene(0);
 
     let mut view_debug_gui = false;

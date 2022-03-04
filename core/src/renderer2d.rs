@@ -8,9 +8,8 @@
 // Draw quad w/ color & alpha
 // Draw textured quad
 // Draw text
-
-use graphics::prelude::*;
-use assets::prelude::*;
+use sundile_graphics::prelude::*;
+use sundile_assets::prelude::*;
 use wgpu::*;
 use wgpu::util::*;
 use std::collections::HashMap;
@@ -52,6 +51,7 @@ impl Vertex for Vert2d {
 }
 
 /// Sprite struct. Always contained within a TextureAtlas.
+#[allow(dead_code)]
 pub struct Sprite {
     frames: Vec<[u32;2]>, //xy in pixel coordinates on the texture
     width: u32,
@@ -60,6 +60,7 @@ pub struct Sprite {
     pub frame: f32,
     pub fps: f32,
 }
+#[allow(dead_code)]
 impl Sprite {
     pub fn new(frames: Vec<[u32;2]>, width: u32, height: u32, num_frames: f32, fps: f32) -> Self {
         Self {
@@ -123,14 +124,14 @@ impl TextureAtlas {
 struct Quad<'a> {
     sprite: Option<&'a str>,
     vertices: [f32;4],
-    color: graphics::Color,
+    color: sundile_graphics::Color,
 }
 
 pub struct Renderer2d<'a> {
     texture_atlas: TextureAtlas,
     queue: Vec<Quad<'a>>,
     pipeline: RenderPipeline,
-    color: graphics::Color,
+    color: sundile_graphics::Color,
     screen_size: [u32;2],
     
     text_wrapper: TextWrapper,
@@ -140,6 +141,7 @@ pub struct Renderer2d<'a> {
     current_font: Option<FontId>,
 }
 
+#[allow(dead_code)]
 impl<'a> Renderer2d<'a> {
     pub fn new(render_target: &RenderTarget, assets: &Assets,) -> Self {
         let (device, config, ) = (
@@ -176,21 +178,21 @@ impl<'a> Renderer2d<'a> {
             push_constant_ranges: &[],
         });
 
-        let shader = device.create_shader_module(&ShaderModuleDescriptor{
-            label: Some("Renderer2D Default Shader"),
-            source: ShaderSource::Wgsl(assets.shaders["2d"].clone().into()),
-        });
+        // let shader = device.create_shader_module(&ShaderModuleDescriptor{
+        //     label: Some("Renderer2D Default Shader"),
+        //     source: ShaderSource::Wgsl(assets.shaders["2d"].clone().into()),
+        // });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("Renderer2D Pipeline"),
             layout: Some(&layout),
             vertex: VertexState {
-                module: &shader,
+                module: &assets.shaders["2d"],
                 entry_point: "vs_main",
                 buffers: &[Vert2d::desc()],
             },
             fragment: Some(FragmentState {
-                module: &shader,
+                module: &assets.shaders["2d"],
                 entry_point: "fs_main",
                 targets: &[ColorTargetState {
                     format: config.format,
@@ -222,7 +224,7 @@ impl<'a> Renderer2d<'a> {
             texture_atlas: TextureAtlas::new(&render_target, &texture_bind_group_layout, &assets.textures["atlas_0"][..]),
             queue: vec![],
             pipeline,
-            color: graphics::Color::from_rgb(1.0, 1.0, 1.0),
+            color: sundile_graphics::Color::from_rgb(1.0, 1.0, 1.0),
             screen_size: [render_target.config.width, render_target.config.height],
 
             text_wrapper,
@@ -234,21 +236,6 @@ impl<'a> Renderer2d<'a> {
     }
 
     pub fn render(&mut self, render_target: &mut RenderTarget) {
-        //TODO: Remove this
-        self.set_color(graphics::Color::from_rgba(0.0, 0.0, 0.0, 0.5));
-        self.draw_quad_rel(0.0, 0.0, 1.0, 1.0);
-
-        self.set_color(graphics::Color::from_rgba(0.0, 0.0, 1.0, 1.0));
-        self.draw_quad(64.0, 32.0, 16.0, 16.0);
-
-        self.set_color(graphics::Color::from_rgba(1.0, 0.0, 0.0, 1.0));
-        self.draw_sprite(32.0, 32.0, 1.0, 1.0, "circle");
-
-        self.set_color(graphics::Color::from_rgb(0.0, 0.0, 0.0));
-        self.set_font("UBUNTUMONO-R", 32.0);
-        self.set_text_bounds(100.0, 100.0);
-        self.draw_text("Hello, world!", 32.0, 32.0);
-
         // smoosh quads into batch
         let mut vertices: Vec<Vert2d> = vec![];
         let mut indices: Vec<u32> = vec![];
@@ -335,7 +322,7 @@ impl<'a> Renderer2d<'a> {
         self.text_wrapper.end_pass(render_target);
     }
 
-    pub fn set_color(&mut self, color: graphics::Color) {
+    pub fn set_color(&mut self, color: sundile_graphics::Color) {
         self.color = color;
     }
 

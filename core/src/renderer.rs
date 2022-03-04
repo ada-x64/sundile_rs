@@ -1,7 +1,7 @@
 use wgpu;
 use winit;
-use graphics::prelude::*;
-use assets::prelude::*;
+use sundile_graphics::prelude::*;
+use sundile_assets::prelude::*;
 use legion::*;
 
 pub fn create_render_pipeline(
@@ -11,20 +11,19 @@ pub fn create_render_pipeline(
 	color_format: wgpu::TextureFormat,
 	depth_format: wgpu::TextureFormat,
 	vertex_layouts: &[wgpu::VertexBufferLayout],
-	shader: wgpu::ShaderModuleDescriptor,
+	vertex_shader: &wgpu::ShaderModule,
+    fragment_shader: &wgpu::ShaderModule,
 ) -> wgpu::RenderPipeline {
-	let shader = device.create_shader_module(&shader);
-
 	device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some(name),
 		layout: layout,
 		vertex: wgpu::VertexState {
-			module: &shader,
+			module: &vertex_shader,
 			entry_point: "vs_main",
 			buffers: vertex_layouts
 		},
 		fragment: Some(wgpu::FragmentState {
-			module: &shader,
+			module: &fragment_shader,
 			entry_point: "fs_main",
 			targets: &[wgpu::ColorTargetState {
 				format: color_format,
@@ -103,10 +102,6 @@ impl Renderer {
                     ],
                 push_constant_ranges: &[],
             });
-            let shader = wgpu::ShaderModuleDescriptor {
-                label: Some("Model Shader"),
-                source: wgpu::ShaderSource::Wgsl(assets.shaders["default"].clone().into()),
-            };
             create_render_pipeline(
                 "Model Pipeline",
                 &device,
@@ -114,7 +109,8 @@ impl Renderer {
                 config.format,
                 Texture::DEPTH_FORMAT,
                 &[ModelVertex::desc(), InstanceRaw::desc()],
-                shader,
+                &assets.shaders["default"],
+                &assets.shaders["default"],
             )
         };
 

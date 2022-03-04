@@ -10,6 +10,7 @@ pub struct LightUniform {
 	pub _padding: u32,
 	pub color: [f32; 4],
 }
+
 impl Default for LightUniform {
     fn default() -> Self {
         Self {
@@ -51,7 +52,7 @@ impl LightWrapper {
                         count: None,
                     }
                 ],
-                label: None,
+                label: Some("Light Buffer Layout"),
             }
         );
 
@@ -72,17 +73,25 @@ impl LightWrapper {
     }
     /// Gets the current light bind group and clears the light uniforms for this pass.
     pub fn get_bind_group(&mut self, device: &wgpu::Device) -> BindGroup {
-        let mut buffers = vec![];
-        for i in 0..NUM_LIGHTS {
-            buffers.push(device.create_buffer_init(
-                &util::BufferInitDescriptor {
-                    label: Some(format!("Light VB {}", i).as_str()),
-                    contents: bytemuck::cast_slice(&[self.lights[i]]),
-                    usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-                }
-            ));
-            self.lights[i] = LightUniform::default();
-        }
+        // let mut buffers = vec![];
+        // for i in 0..NUM_LIGHTS {
+        //     buffers.push(device.create_buffer_init(
+        //         &util::BufferInitDescriptor {
+        //             label: Some(format!("Light VB {}", i).as_str()),
+        //             contents: bytemuck::cast_slice(&[self.lights[i]]),
+        //             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        //         }
+        //     ));
+        //     self.lights[i] = LightUniform::default();
+        // }
+
+        let buffer = device.create_buffer_init(
+            &util::BufferInitDescriptor {
+                label: Some(format!("Lights Buffer").as_str()),
+                contents: bytemuck::cast_slice(&[self.lights]),
+                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            }
+        );
 
         device.create_bind_group(
             &BindGroupDescriptor {
@@ -90,43 +99,7 @@ impl LightWrapper {
                 entries: &[
                     BindGroupEntry {
                         binding: 0,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 2,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 3,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 4,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 5,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 6,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 7,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 8,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 9,
-                        resource: buffers.pop().unwrap().as_entire_binding(),
+                        resource: buffer.as_entire_binding(),
                     },
                 ],
                 label: None,

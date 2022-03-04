@@ -1,28 +1,51 @@
 use std::collections::HashMap;
 use anyhow::*;
-use crate::*;
+use crate::internal::*;
+use wgpu::*;
+use sundile_graphics::render_target::RenderTarget;
+use std::path::*;
+use std::fs::*;
+use std::io::Read;
+use naga::{
+    valid::{ValidationFlags, Validator, Capabilities},
+    front::wgsl,
+    back::spv,
+    back::spv::WriterFlags,
+};
 
-pub type Map = HashMap<String, String>;
+type ShaderData = Vec<u32>;
 
-pub fn load(asset_dir: &PathBuf) -> Result<Map> {
-    // TODO: Compile here so you don't run into validation errors at runtime.
-    // Maybe use naga or one of the inline macro libs.
-    //Iterate over textures in ASSET_DIR/shaders and compile them into SPIR-V.
-    //Possibly compress this data into binary to be included in EXE / .dat file.
-    
-    echo("Loading shaders...");
-    let mut res = Map::new();
-    let mut path = asset_dir.to_owned();
-    path.push("shaders");
+impl DataType<ShaderModule> for ShaderData {
+    fn load(path: &PathBuf) -> Self {
 
-    let dir = read_dir(path)?.into_iter();
-    for entry in dir {
-        let entry = entry?;
-        let filename = entry.path().file_stem().unwrap().to_str().unwrap().to_string();
+        //Note: Not just loading this in because all the frontends expect words but reading a file gives bytes.
+        let mut naga = std::process::Command::new("naga").args([path.to_str().unwrap()]).spawn().expect("Unable to spawn naga. Is it installed?");
+        if !naga.wait().unwrap().success() {
+            panic!()
+        }
+
         let mut buffer = String::new();
-        let mut file = File::open(entry.path())?;
-        file.read_to_string(&mut buffer)?;
-        res.insert(filename, buffer);
+        let mut file = File::open(path).unwrap();
+        file.read_to_string(&mut buffer).unwrap();
+        let source_text = buffer.as_str();
+        let module = wgsl::parse_str(source_text).unwrap();
+        let info = Validator::new(ValidationFlags::all(), Capabilities::all()).validate(&module).unwrap();
+        let options = spv::Options {
+            flags: WriterFlags::LABEL_VARYINGS | WriterFlags::CLAMP_FRAG_DEPTH | WriterFlags::DEBUG,
+            ..Default::default()
+        };
+        spv::write_vec(&module, &info, &options, None).unwrap()
     }
-    Ok(res)
+
+    fn convert(self, render_target: &RenderTarget) -> Result<ShaderModule>  {
+        Ok(unsafe {
+            render_target.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+            label: None,
+            source: self.into(),
+            })
+        })
+    }
 }
+
+pub type DataMap = HashMap<String, ShaderData>;
+pub type EmbeddedMap = HashMap<String, ShaderModule>;

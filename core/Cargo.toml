@@ -15,9 +15,6 @@ anyhow = "*"
 
 chrono = "*"
 
-noise = "*"
-rand = "*"
-
 legion = "*"
 
 egui = "0.16"
@@ -27,5 +24,7 @@ epi = "0.16"
 
 wgpu_glyph = "0.16.0"
 
-graphics = {path = "../graphics/"}
-assets = { path = "../assets/" }
+bincode = "*"
+
+sundile_graphics = {path = "../graphics/"}
+sundile_assets = { path = "../assets/" }

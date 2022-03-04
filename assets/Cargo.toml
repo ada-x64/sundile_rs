@@ -1,17 +1,16 @@
 [package]
-name = "assets"
+name = "sundile_assets"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "*"
 bincode = "*"
 serde = {version = "*", features = ["derive"]}
-graphics = { path = "../graphics" }
 tobj = "*"
-inline-spirv = "*"
 cgmath = "*"
 wgpu = "*"
 bytemuck = "*"
+naga = "*"
+
+sundile_graphics = { path = "../graphics/" }

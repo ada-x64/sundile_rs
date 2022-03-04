@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use anyhow::*;
 use crate::internal::*;
-use graphics::prelude::*;
+use sundile_graphics::prelude::*;
 use cgmath::InnerSpace;
 use wgpu::util::DeviceExt;
 use std::path::*;
@@ -30,10 +30,8 @@ pub struct ModelData {
     pub meshes: Vec<MeshData>,
 }
 
-//TODO: Make this a trait and implement for other types.
-impl Datatype<Model> for ModelData {
+impl DataType<Model> for ModelData {
     fn load(path: &PathBuf) -> Self {
-        echo(format!("Loading {}...", path.as_path().display()).as_str());
         let (obj_models, obj_materials) = tobj::load_obj(
             &path,
             &tobj::LoadOptions {
@@ -41,20 +39,20 @@ impl Datatype<Model> for ModelData {
                 single_index: true,
                 ..Default::default()
             },
-        ).unwrap();
+        ).expect("Failed to load .obj");
 
-        echo("Parsing .obj...");
-        let obj_materials = obj_materials.unwrap();
+        let obj_materials = obj_materials.expect("Failed to unwrap materials");
 
+        let dir = path.parent().unwrap();
         let mut materials = Vec::new();
         for mat in obj_materials {
             //TODO: Probably compress these.
             let mut diffuse_texture = Vec::<u8>::new();
-            let mut file = File::open(path.join(mat.diffuse_texture)).unwrap();
+            let mut file = File::open(dir.join(mat.diffuse_texture)).unwrap();
             file.read_to_end(&mut diffuse_texture).unwrap();
 
             let mut normal_texture = Vec::<u8>::new();
-            let mut file = File::open(path.join(mat.normal_texture)).unwrap();
+            let mut file = File::open(dir.join(mat.normal_texture)).unwrap();
             file.read_to_end(&mut normal_texture).unwrap();
 
             materials.push(MaterialData {
@@ -229,45 +227,42 @@ impl Datatype<Model> for ModelData {
     }
 }
 
-//TODO: Wrap this in a struct and implement a trait for other conversions.
 
 pub type DataMap = HashMap<String, ModelData>;
 pub type EmbeddedMap = HashMap<String, Model>;
 
-impl Map<EmbeddedMap> for DataMap {
-    fn load(asset_dir: &PathBuf) -> DataMap {
-        //Iterate over textures in ASSET_DIR/shaders and compile them into SPIR-V.
-        //Possibly compress this data into binary to be included in EXE / .dat file.
+// impl Map<EmbeddedMap> for DataMap {
+//     fn load(asset_dir: &PathBuf) -> DataMap {
         
-        echo("Loading models...");
-        let mut res = DataMap::new();
-        let mut path = asset_dir.to_owned();
-        path.push("models");
+//         echo("Loading models...");
+//         let mut res = DataMap::new();
+//         let mut path = asset_dir.to_owned();
+//         path.push("models");
 
-        let dir = read_dir(path).unwrap().into_iter();
-        for subdir in dir {
-            let objs = read_dir(subdir.unwrap().path()).unwrap().into_iter().filter(
-                |entry| {
-                    entry.as_ref().expect("bad directory entry!").path().extension().unwrap() == ".obj"
-                });
-            for obj in objs {
-                let obj = obj.unwrap();
-                let name = obj.path().file_stem().unwrap().to_str().unwrap().to_string();
-                res.insert(name, ModelData::load(&obj.path()));
-            }
-        }
-        res
-    }
+//         let dir = read_dir(path).unwrap().into_iter();
+//         for subdir in dir {
+//             let objs = read_dir(subdir.unwrap().path()).unwrap().into_iter().filter(
+//                 |entry| {
+//                     entry.as_ref().expect("bad directory entry!").path().extension().unwrap() == ".obj"
+//                 });
+//             for obj in objs {
+//                 let obj = obj.unwrap();
+//                 let name = obj.path().file_stem().unwrap().to_str().unwrap().to_string();
+//                 res.insert(name, ModelData::load(&obj.path()));
+//             }
+//         }
+//         res
+//     }
 
-    fn convert(self, render_target: &RenderTarget) -> Result<EmbeddedMap> {
-        Ok(EmbeddedMap::from_iter(
-            self.into_iter().map(
-                |(name, data)| -> (String, Model) {
-                    let data = data.convert(render_target)
-                        .expect(format!("Unable to convert {}.obj", &name).as_str());
-                    (name, data)
-                }
-            )
-        ))
-    }
-}
+//     fn convert(self, render_target: &RenderTarget) -> Result<EmbeddedMap> {
+//         Ok(EmbeddedMap::from_iter(
+//             self.into_iter().map(
+//                 |(name, data)| -> (String, Model) {
+//                     let data = data.convert(render_target)
+//                         .expect(format!("Unable to convert {}.obj", &name).as_str());
+//                     (name, data)
+//                 }
+//             )
+//         ))
+//     }
+// }

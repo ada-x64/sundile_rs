@@ -1,5 +1,5 @@
 use winit::{event::*, window::*};
-use graphics::prelude::*;
+use sundile_graphics::prelude::*;
 use egui_winit_platform::*;
 use egui_wgpu_backend::*;
 use std::time::*;
