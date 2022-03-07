@@ -1,17 +1,24 @@
 use crate::prelude::*;
 use wgpu::util::*;
+use cgmath::*;
 pub struct Instance {
-	pub position: cgmath::Vector3<f32>,
-	pub rotation: cgmath::Quaternion<f32>,
+	pub position: Vector3<f32>,
+	pub rotation: Quaternion<f32>,
 }
 
 impl Instance {
 	pub fn to_raw(&self) -> InstanceRaw {
 		InstanceRaw {
-			model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
-			normal: cgmath::Matrix3::from(self.rotation).into(),
+			model: (Matrix4::from_translation(self.position) * Matrix4::from(self.rotation)).into(),
+			normal: Matrix3::from(self.rotation).into(),
 		}
 	}
+	// pub fn from_transform(t: sundile_scripting::components::Transform) -> Self {
+	// 	Self {
+	// 		position: Vector3::new(t.x, t.y, t.z),
+	// 		rotation: Quaternion::from(Euler::new(Deg(t.yaw), Deg(t.pitch), Deg(t.roll)))
+	// 	}
+	// }
 }
 
 #[repr(C)]
@@ -73,7 +80,7 @@ impl Vertex for InstanceRaw {
 pub struct InstanceCache {
     instances: Vec<Instance>,
     buffer: Option<wgpu::Buffer>,
-    stale: bool,
+    dirty: bool,
 }
 
 impl InstanceCache {
@@ -81,30 +88,30 @@ impl InstanceCache {
         Self {
             instances: vec![],
             buffer: None,
-            stale: true,
+            dirty: true,
             // ranges: vec![],
         }
     }
 
     pub fn insert(&mut self, instance: Instance) {
-        self.stale = false;
+        self.dirty = true;
         self.instances.push(instance);
     }
 
     pub fn clear(&mut self) {
-        self.stale = false;
+        self.dirty = true;
         self.instances.clear();
     }
 
     pub fn update(&mut self, device: &wgpu::Device) {
-        if !self.stale {
+        if self.dirty {
             self.buffer = Some(device.create_buffer_init(&BufferInitDescriptor {
                 label: None,
                 contents: bytemuck::cast_slice(&self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>()),
                 usage: wgpu::BufferUsages::VERTEX,
             }));
         }
-        self.stale = true;
+        self.dirty = false;
     }
 
     pub fn set_ranges(&mut self) {

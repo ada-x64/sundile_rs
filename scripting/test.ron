@@ -1,0 +1,17 @@
+{
+    entities: {
+        "a5645ac9-d587-401c-91c4-47164015bdf6": {
+            "Transform": (
+                x: 0,
+                y: 0,
+                z: 0,
+                yaw: 0,
+                pitch: 0,
+                roll: 0,
+            ),
+            "Model": (
+                name: "test-cube",
+            ),
+        },
+    },
+}

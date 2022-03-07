@@ -5,18 +5,18 @@ use sundile_assets::prelude::*;
 use legion::*;
 use std::collections::HashMap;
 
-pub struct Renderer {
+pub struct Renderer<'a> {
     pub viewport: Option<Viewport>,
 
     pub camera_wrapper: CameraWrapper,
-    pub light_wrapper: LightWrapper,
+    pub light_wrapper: LightWrapper<'a>,
     
 	model_pipeline: wgpu::RenderPipeline,
 
-    instance_cache_map: HashMap<String, InstanceCache>,
+    instance_cache_map: HashMap<String, InstanceCache>, // Maps models to instance caches by name
 }
 
-impl Renderer {
+impl<'a> Renderer<'a> {
 
     pub fn new(render_target: &RenderTarget, assets: &Assets, viewport: Option<Viewport>) -> Self {
         //
@@ -34,6 +34,8 @@ impl Renderer {
 
         let camera_wrapper = CameraWrapper::new(&device, width, height);
         let light_wrapper = LightWrapper::new(&device,);
+        // light_wrapper.set_ambient(Color::from_rgba(1.0, 1.0, 1.0, 0.1).as_array());
+        // light_wrapper.add_light("test", LightUniform::new([0.0, 1.0, 0.0], [1.0, 1.0, 1.0, 1.0])).unwrap();
     
         //
         // Pipelines
@@ -99,7 +101,6 @@ impl Renderer {
             })
         };
 
-        //NOTE: Clone here because assets struct is dropped in game::new()
         let cache_iter = assets.models.iter().map(|(name, _)| {
             (name.to_owned(), InstanceCache::new())
         });
@@ -118,6 +119,16 @@ impl Renderer {
 
 	pub fn update(&mut self, dt: std::time::Duration) {
         self.camera_wrapper.update(dt);
+
+        // TODO: Lights aren't working. Ambient is fine.
+        // use cgmath::*;
+        // let mut light = self.light_wrapper.get_light("test").unwrap();
+        // light.position = [
+        //     light.position[0] + Angle::cos(Rad::<f32>(std::f32::consts::PI * dt.as_secs_f32())),
+        //     light.position[1],
+        //     light.position[2] + Angle::sin(Rad::<f32>(std::f32::consts::PI * dt.as_secs_f32())),
+        // ];
+        // self.light_wrapper.update_light("test", light).unwrap();
 	}
 
     pub fn handle_input(&mut self, event: &winit::event::DeviceEvent) {
@@ -133,12 +144,12 @@ impl Renderer {
         let camera_bind_group = &self.camera_wrapper.bind_group;
 
         for (_, cache) in &mut self.instance_cache_map {
-            use cgmath::*;
-            cache.clear();
-            cache.insert(Instance { //TEMP
-                position: Vector3::zero(),
-                rotation: Quaternion::zero(),
-            });
+            // use cgmath::*;
+            // cache.clear();
+            // cache.insert(Instance { //TEMP
+            //     position: Vector3::zero(),
+            //     rotation: Quaternion::zero(),
+            // });
             cache.update(&render_target.device);
         }
 

@@ -6,10 +6,16 @@ mod renderer2d;
 
 use winit::{event::*, event_loop::*, window::*};
 use std::time::*;
+use std::collections::HashMap;
 
 use sundile_graphics::prelude::*;
 
-pub fn run(bin: &[u8]) {
+/// Function type for scenes.
+pub type SceneFn = fn(&mut legion::World);
+/// Map type for scenes.
+pub type SceneMap = HashMap<&'static str, SceneFn>;
+
+pub fn run(bin: &[u8], scenes: SceneMap) {
     println!("===\n=== RUN AT {:?}\n===", chrono::Local::now());
 
     let event_loop = EventLoop::new();
@@ -26,8 +32,7 @@ pub fn run(bin: &[u8]) {
     let assets = sundile_assets::parse(bin, &render_target);
 
     let mut gui = debug_gui::DebugGui::new(&render_target, &window);
-    let mut game = game::Game::new(&render_target, &assets, None);
-    game.init_scene(0);
+    let mut game = game::Game::new(&render_target, &assets, scenes, None);
 
     let mut view_debug_gui = false;
     let mut fps = 0.0;
@@ -69,8 +74,11 @@ pub fn run(bin: &[u8]) {
                             match input.virtual_keycode {
                                 Some(code) => {
                                     match code {
-                                        VirtualKeyCode::Escape => {
+                                        VirtualKeyCode::F5 => {
                                             view_debug_gui = !view_debug_gui;
+                                        }
+                                        VirtualKeyCode::Escape => {
+                                            *control_flow = ControlFlow::Exit;
                                         }
                                         _ => {}
                                     }

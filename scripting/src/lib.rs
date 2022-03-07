@@ -1,15 +1,38 @@
-use legion::*;
-
 pub mod components;
-pub mod example_scene;
+// pub mod scene;
 
-pub trait Component : 'static + Sized + Send + Sync {}
+#[test]
+fn test_serialize() {
 
-pub struct Scene {
-    entities: Vec<Box<dyn Component>>
+    use legion::{*, serialize::*};
+    use components::*;
+
+    let mut world = World::default();
+    world.push((
+        Transform::default(),
+        Model {name: "test-cube".to_string()},
+    ));
+
+    let mut registry = Registry::<String>::default();
+    components::register(&mut registry);
+
+    let ron = ron::ser::to_string_pretty(&world.as_serializable(
+        legion::any(),
+        &registry,
+    &Canon::default()
+        ),
+        ron::ser::PrettyConfig::new()
+    ).unwrap();
+
+    std::fs::write("./test.ron", ron).unwrap();
+
 }
-impl Scene {
-    pub fn load(&self, world: &legion::World) {
-        
-    }
+
+#[test]
+fn test_deserialize() {
+    use legion::{*, serialize::*};
+    use components::*;
+
+    let data = ron::from_str::<Vec<dyn Component>>(include_str!("./example_scene.ron")).unwrap();
+
 }

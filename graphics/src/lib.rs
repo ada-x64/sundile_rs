@@ -47,6 +47,18 @@ impl Color {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Position {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+impl Position {
+    pub fn as_array(&self) -> [f32;3] {
+        [self.x, self.y, self.z]
+    }
+}
+
 /// Stores a viewport in screenspace coordinates (-1.0, 1.0)
 #[derive(Debug, Clone, Copy)]
 pub struct Viewport {

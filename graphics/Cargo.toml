@@ -22,3 +22,5 @@ chrono = "*"
 futures = "*"
 wgpu_glyph = "*"
 serde = "*"
+
+# sundile_scripting = { path = "../scripting"}

@@ -1,0 +1,22 @@
+// A scene is a list of tuples of structs.
+[
+    (
+        // Note: Every entity will have a default Transform attached to it.
+        Model(
+            name: "test-cube"
+        )
+    ),
+    (
+        Transform(
+            x: 1,
+            y: 0,
+            z: 0,
+            yaw: 0,
+            pitch: 0,
+            roll: 0,
+        ),
+        Model(
+            name: "test-cube"
+        )
+    ),
+]
