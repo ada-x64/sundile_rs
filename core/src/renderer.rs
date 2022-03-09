@@ -18,7 +18,7 @@ pub struct Renderer<'a> {
 
 impl<'a> Renderer<'a> {
 
-    pub fn new(render_target: &RenderTarget, assets: &Assets, viewport: Option<Viewport>) -> Self {
+    pub fn new(render_target: &RenderTarget, assets: &mut Assets, viewport: Option<Viewport>) -> Self {
         //
         // Setup
         //
@@ -45,66 +45,76 @@ impl<'a> Renderer<'a> {
         let light_bind_group_layout = &light_wrapper.bind_group_layout;
         let texture_bind_group_layout = Texture::get_bind_group_layout(device);
 
-        let model_pipeline = {
-            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[
-                    &texture_bind_group_layout,
-                    &camera_bind_group_layout,
-                    &light_bind_group_layout,
-                    ],
-                push_constant_ranges: &[],
-            });
-            
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Model Pipeline"),
-                layout: Some(&layout),
-                vertex: wgpu::VertexState {
-                    module: &assets.shaders["default"],
-                    entry_point: "vs_main",
-                    buffers: &[
-                        ModelVertex::desc(),
-                        InstanceRaw::desc(),
-                    ]
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &assets.shaders["default"],
-                    entry_point: "fs_main",
-                    targets: &[wgpu::ColorTargetState {
-                        format: config.format,
-                        blend: Some(wgpu::BlendState::REPLACE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: Some(wgpu::Face::Back),
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: Texture::DEPTH_FORMAT,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-                multiview: None,
-            })
-        };
+        let model_bind_group_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[
+                &texture_bind_group_layout,
+                &camera_bind_group_layout,
+                &light_bind_group_layout,
+                ],
+            push_constant_ranges: &[],
+        });
+
+        let model_pipeline =  device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Model Pipeline"),
+            layout: Some(&model_bind_group_layout),
+            vertex: wgpu::VertexState {
+                module: &assets.shaders["default"],
+                entry_point: "vs_main",
+                buffers: &[
+                    ModelVertex::desc(),
+                    InstanceRaw::desc(),
+                ]
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &assets.shaders["default"],
+                entry_point: "fs_main",
+                targets: &[wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
 
         let cache_iter = assets.models.iter().map(|(name, _)| {
             (name.to_owned(), InstanceCache::new())
         });
-        let instance_cache_map = HashMap::from_iter(cache_iter);
+        let mut instance_cache_map = HashMap::from_iter(cache_iter);
+
+        //TODO: REMOVE ME
+        let model = slib_terrain::temp_model(&assets, &render_target);
+        assets.models.insert("terrain".to_string(), model);
+
+        use cgmath::*;
+        let mut cache = InstanceCache::new();
+        cache.insert(Instance {
+            position: cgmath::Vector3::zero(),
+            rotation: cgmath::Quaternion::zero(),
+        });
+        instance_cache_map.insert("terrain".to_string(), cache);
 
         Renderer {
             viewport,

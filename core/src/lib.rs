@@ -29,10 +29,10 @@ pub fn run(bin: &[u8], scenes: SceneMap) {
 
     let mut render_target = futures::executor::block_on(RenderTarget::new(&window, false, Some("Renderer")));
 
-    let assets = sundile_assets::parse(bin, &render_target);
+    let mut assets = sundile_assets::parse(bin, &render_target);
 
     let mut gui = debug_gui::DebugGui::new(&render_target, &window);
-    let mut game = game::Game::new(&render_target, &assets, scenes, None);
+    let mut game = game::Game::new(&render_target, &mut assets, scenes, None);
 
     let mut view_debug_gui = false;
     let mut fps = 0.0;

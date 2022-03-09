@@ -17,8 +17,9 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
-    pub fn new(render_target: &RenderTarget, assets: &Assets, scenes: SceneMap, viewport: Option<Viewport>) -> Self  {
-        let renderer = Renderer::new(&render_target, &assets, viewport);
+    //TODO: mut Assets temporary?
+    pub fn new(render_target: &RenderTarget, assets: &mut Assets, scenes: SceneMap, viewport: Option<Viewport>) -> Self  {
+        let renderer = Renderer::new(&render_target, assets, viewport);
         let renderer2d = Renderer2d::new(&render_target, &assets,);
 
         let resources = Resources::default();
@@ -51,7 +52,6 @@ impl<'a> Game<'a> {
         self.renderer.handle_input(&e);
     }
 
-    //TODO: p3 -> find a way to do this without passing render_target?
     //TODO: Scenes should be assets loaded with AssetManager struct.
     pub fn set_scene<'s>(&mut self, scene: &'s str) {
         self.world.clear();

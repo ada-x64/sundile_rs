@@ -30,6 +30,7 @@ pub struct ModelData {
     pub meshes: Vec<MeshData>,
 }
 
+//TODO: Clean this up using new Model fns
 impl DataType<Model> for ModelData {
     fn load(path: &PathBuf) -> Self {
         let (obj_models, obj_materials) = tobj::load_obj(

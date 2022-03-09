@@ -28,3 +28,6 @@ bincode = "*"
 
 sundile_graphics = {path = "../graphics/"}
 sundile_assets = { path = "../assets/" }
+
+# FOR TESTING ONLY
+slib_terrain = { path = "../../lib/terrain" }
