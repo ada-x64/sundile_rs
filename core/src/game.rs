@@ -1,15 +1,17 @@
 use std::time::*;
 use legion::*;
+
 use sundile_graphics::prelude::*;
 use sundile_assets::prelude::*;
+use sundile_scripting::prelude::*;
 
 use crate::renderer::*;
 use crate::renderer2d::*;
-use crate::SceneMap;
 
 pub struct Game<'a> {
     pub renderer: Renderer<'a>,
     pub renderer2d: Renderer2d<'a>,
+    pub paused: bool,
     world: World,
     schedule: Schedule,
     resources: Resources,
@@ -18,7 +20,7 @@ pub struct Game<'a> {
 
 impl<'a> Game<'a> {
     //TODO: mut Assets temporary?
-    pub fn new(render_target: &RenderTarget, assets: &mut Assets, scenes: SceneMap, viewport: Option<Viewport>) -> Self  {
+    pub fn new(render_target: &RenderTarget, assets: &mut AssetTypeMap, scenes: SceneMap, viewport: Option<Viewport>, paused: bool) -> Self  {
         let renderer = Renderer::new(&render_target, assets, viewport);
         let renderer2d = Renderer2d::new(&render_target, &assets,);
 
@@ -31,24 +33,28 @@ impl<'a> Game<'a> {
         Game {
             renderer,
             renderer2d,
+            paused,
             world,
             schedule: Schedule::builder().build(), //TODO: Replace this with an actual script.
             resources,
-            scenes
+            scenes,
         }
     }
 
     pub fn update(&mut self, dt: Duration) {
+        if self.paused {return;}
         self.renderer.update(dt);
         self.schedule.execute(&mut self.world, &mut self.resources,);
     }
 
-    pub fn render(&mut self, render_target: &mut RenderTarget, assets: &Assets) {
+    pub fn render(&mut self, render_target: &mut RenderTarget, assets: &AssetTypeMap) {
+        if self.paused {return;}
         self.renderer.render(render_target, &self.world, assets);
         self.renderer2d.render(render_target);
     }
 
     pub fn handle_input(&mut self, e: &winit::event::DeviceEvent) {
+        if self.paused {return;}
         self.renderer.handle_input(&e);
     }
 

@@ -1,105 +1,106 @@
 use std::collections::HashMap;
-use serde::*;
 use std::path::*;
+
+use sundile_graphics::prelude::HeadlessRenderTarget;
 use sundile_graphics::render_target::RenderTarget;
-use crate::converters::*;
-use crate::util::*;
-use anyhow::*;
 
-pub type AssetMap = HashMap<String, Vec<u8>>;
+// ---
+// The below types deal with Assets as they are presented to the game.
+// ---
 
-pub trait DataType<T> {
-    fn load(path: &PathBuf) -> Self;
-    fn convert(self, render_target: &RenderTarget) -> Result<T>;
+//TODO: Create crate for proc_macro.
+/// Asset trait required for types to be handled by [AssetMap] / [AssetTypeMap].
+pub trait Asset {
+    fn get_type_name(&self) -> &'static str;
 }
 
-pub trait Map<EmbeddedType> {
-    fn load<'a>(asset_dir: &PathBuf, subdir: &'a str, extension: &'a str) -> Self;
-    fn convert(self, render_target: &RenderTarget) -> Result<HashMap<String, EmbeddedType>>;
+/// Maps assets of a particular type. Typically used inside of [AssetTypeMap].
+/// Because we want [AssetTypeMap] to be extensible, this type takes in a type that satisfies the Asset trait.
+pub type AssetMap<'a> = HashMap<String, Box<dyn Asset + 'a>>;
+/// Maps assets in the pattern `asset_map["asset_type"]["asset_name"]`, e.g. `asset_map["models"]["test_cube"]`
+pub type AssetTypeMap<'a> = HashMap<String, AssetMap<'a>>;
+pub trait AssetTypeMapFns {
+    fn combine(&mut self, other: Self);
+    fn asset<'f, S, T>(&'f self, asset_type_name: S, asset_name: S) -> T where S : Into<String>, T: From<&'f Box<dyn Asset + 'f>>;
 }
-
-fn search_directory<'a>(path: &PathBuf, extension: &'a str) -> Result<Vec<PathBuf>> {
-    let mut res = Vec::new();
-    for item in path.read_dir()? {
-        let path = item?.path();
-        if path.is_dir() {
-            res.append(&mut search_directory(&path, extension)?);
-        }
-        else if path.extension().unwrap_or(&std::ffi::OsStr::new("")) == extension {
-            res.push(path);
-        }
-    }
-    Ok(res)
-}
-
-impl<T, EmbeddedType> Map<EmbeddedType> for HashMap<String, T> where T: DataType<EmbeddedType> {
-    fn load<'a>(asset_dir: &PathBuf, subdir: &'a str, extension: &'a str) -> Self {
-        echo(format!("Loading {}/*.{} ", subdir, extension).as_str());
-        let mut res = HashMap::new();
-        let mut path = asset_dir.to_owned();
-        path.push(subdir);
-        for path in search_directory(&path, extension)
-            .expect(format!("Failed to traverse {}", path.display()).as_str())
-            {
-            let name = path.file_stem().unwrap().to_str().unwrap().to_string();
-            echo(path.file_name().unwrap().to_str().unwrap());
-            res.insert(name, T::load(&path));
-        }
-        res
-    }
-
-    fn convert(self, render_target: &RenderTarget) -> Result<HashMap<String, EmbeddedType>> {
-        Ok(HashMap::from_iter(
-            self.into_iter().map(
-                |(name, data)| -> (String, EmbeddedType) {
-                    let data = data.convert(render_target)
-                        .expect(format!("Unable to convert {}", &name).as_str());
-                    (name, data)
+impl<'a> AssetTypeMapFns for AssetTypeMap<'a> {
+    fn combine(&mut self, other: AssetTypeMap<'a>) {
+        for (asset_type, new_map) in other.into_iter() {
+            match self.get_mut(&asset_type) {
+                Some(old_map) => {
+                    old_map.extend(new_map);
                 }
-            )
-        ))
+                None => {
+                    self.insert(asset_type, new_map);
+                }
+            }
+        }
+    }
+    
+    fn asset<'f, S, T>(&'f self, asset_type_name: S, asset_name: S) -> T where S : Into<String>, T: From<&'f Box<dyn Asset + 'f>> {
+        self.get(&asset_type_name.into()).unwrap().get(&asset_name.into()).unwrap().into()
     }
 }
 
-//TODO: Make this a hashmap so it's extensible by libraries.
-#[derive(Serialize, Deserialize)]
-pub struct AssetsData {
-    pub shaders: shader::DataMap,
-    pub textures: AssetMap,
-    pub models: model::DataMap,
-    pub audio: AssetMap,
-    pub fonts: AssetMap,
+
+// ---
+// The below types deal with Assets as they are stored in bytecode / data.bin.
+// ---
+
+/// [AssetMap] to be used with bytecode data. Automatically derives serialization.
+pub type BincodeAssetMap = HashMap<String, Vec<u8>>;
+/// [AssetTypeMap] to be used with bytecode data. Automatically derives serialization.
+pub type BincodeAssetTypeMap = HashMap<String, BincodeAssetMap>;
+
+
+// ---
+// The below types deal with Assets as they are loaded from disk in the raw form.
+// ---
+
+/// Represents an [Asset] as loaded directly from disk.
+/// This is an intermediary form, which should be converted to Asset types and loaded into [AssetMap]s.
+pub trait RawAsset<AssetType> where AssetType : Asset {
+    /// Loads an individual asset from disk and stores it in this type.
+    fn from_disk(path: &PathBuf) -> Self;
+    /// Converts this type to the AssetType to be used with the engine.
+    fn to_asset<'f>(self, render_target: &AssetBuilder<'f>) -> AssetType;
 }
 
-//TODO: add impl to check if asset exists, possibly load default value if none found
-pub struct Assets {
-    pub shaders: shader::EmbeddedMap,
-    pub textures: AssetMap,
-    pub models: model::EmbeddedMap,
-    pub audio: AssetMap,
-    pub fonts: AssetMap,
+/// Type that converts a specified RawAsset type to a specified Asset type.
+pub trait RawAssetMapper {
+    /// Loads all relevant files from disk.
+    /// Tip: call RawAsset::load_from_disk internally.
+    fn load(&mut self, asset_dir: &PathBuf);
+    /// Converts from raw data to the representation used in-game.
+    fn to_asset_map<'a>(self: Box<Self>, asset_builder: &AssetBuilder) -> AssetMap<'a>;
+    /// Deserializes from bytecode into raw asset data.
+    fn load_bin_map(&mut self, bin_map: BincodeAssetMap);
+    /// Serializes self from raw asset data to bytecode
+    fn to_bin_map(self: Box<Self>) -> BincodeAssetMap;
 }
 
-// impl core::fmt::Debug for AssetsData {
-//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-//         write!(f, "Assets [\nshaders: {:?}\ntextures: {:?}\nmodels: {:?}\naudio: {:?}\nfonts: {:?}]",
-//             self.shaders.keys(),
-//             self.textures.keys(),
-//             self.models.keys(),
-//             self.audio.keys(),
-//             self.fonts.keys(),
-//         )
-//     }
-// }
+/// Hashmap from string to RawAsset.
+pub type RawAssetMap<'a, AssetType> = HashMap<String, Box<dyn RawAsset<AssetType> + 'a>>;
 
-impl AssetsData {
-    pub fn parse(self, render_target: &RenderTarget) -> Result<Assets> {
-        Ok(Assets {
-            shaders: self.shaders.convert(&render_target)?,
-            textures: self.textures,
-            models: self.models.convert(&render_target)?,
-            audio: self.audio,
-            fonts: self.fonts,
-        })
+/// Builds assets from a RenderTarget.
+/// Only intended to last for the duration of a deserialization call.
+pub struct AssetBuilder<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+}
+impl<'a> From<&'a HeadlessRenderTarget> for AssetBuilder<'a> {
+    fn from(other: &'a HeadlessRenderTarget) -> Self {
+        AssetBuilder {
+            device: &other.device,
+            queue: &other.queue
+        }
+    }
+}
+impl<'a> From<&'a RenderTarget> for AssetBuilder<'a> {
+    fn from(other: &'a RenderTarget) -> Self {
+        AssetBuilder {
+            device: &other.device,
+            queue: &other.queue
+        }
     }
 }

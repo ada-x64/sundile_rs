@@ -1,13 +1,18 @@
-use std::collections::HashMap;
-use anyhow::*;
-use crate::internal::*;
-use sundile_graphics::prelude::*;
 use cgmath::InnerSpace;
 use wgpu::util::DeviceExt;
 use std::path::*;
 use std::fs::*;
 use std::io::Read;
 use serde::*;
+
+use crate::prelude::*;
+use sundile_graphics::prelude::*;
+
+impl Asset for Model {
+    fn get_type_name(&self) -> &'static str {
+        "Model"
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct MaterialData {
@@ -31,8 +36,8 @@ pub struct ModelData {
 }
 
 //TODO: Clean this up using new Model fns
-impl DataType<Model> for ModelData {
-    fn load(path: &PathBuf) -> Self {
+impl RawAsset<Model> for ModelData {
+    fn from_disk(path: &PathBuf) -> Self {
         let (obj_models, obj_materials) = tobj::load_obj(
             &path,
             &tobj::LoadOptions {
@@ -157,15 +162,15 @@ impl DataType<Model> for ModelData {
         Self {meshes, materials}
     }
 
-    fn convert(self, render_target: &RenderTarget) -> Result<Model> {
-        let (device, queue) = (&render_target.device, &render_target.queue);
+    fn to_asset(self, builder: &AssetBuilder) -> Model {
+        let (device, queue) = (builder.device, builder.queue);
 
         let mut materials = vec![];
         for data in self.materials {
             let diffuse_texture = Texture::from_bytes(device, queue, &data.diffuse_texture[..], format!("{} diffuse texture", data.name).as_str(), false).unwrap();
             let normal_texture = Texture::from_bytes(device, queue, &data.normal_texture[..], format!("{} normal texture", data.name).as_str(), true).unwrap();
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &Texture::get_bind_group_layout(&render_target.device),
+                layout: &Texture::get_bind_group_layout(device),
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -221,49 +226,26 @@ impl DataType<Model> for ModelData {
             });
         }
 
-        Ok(Model{
+        Model{
             meshes,
             materials,
-        })
+        }
     }
 }
 
 
-pub type DataMap = HashMap<String, ModelData>;
-pub type EmbeddedMap = HashMap<String, Model>;
-
-// impl Map<EmbeddedMap> for DataMap {
-//     fn load(asset_dir: &PathBuf) -> DataMap {
-        
-//         echo("Loading models...");
-//         let mut res = DataMap::new();
-//         let mut path = asset_dir.to_owned();
-//         path.push("models");
-
-//         let dir = read_dir(path).unwrap().into_iter();
-//         for subdir in dir {
-//             let objs = read_dir(subdir.unwrap().path()).unwrap().into_iter().filter(
-//                 |entry| {
-//                     entry.as_ref().expect("bad directory entry!").path().extension().unwrap() == ".obj"
-//                 });
-//             for obj in objs {
-//                 let obj = obj.unwrap();
-//                 let name = obj.path().file_stem().unwrap().to_str().unwrap().to_string();
-//                 res.insert(name, ModelData::load(&obj.path()));
-//             }
-//         }
-//         res
-//     }
-
-//     fn convert(self, render_target: &RenderTarget) -> Result<EmbeddedMap> {
-//         Ok(EmbeddedMap::from_iter(
-//             self.into_iter().map(
-//                 |(name, data)| -> (String, Model) {
-//                     let data = data.convert(render_target)
-//                         .expect(format!("Unable to convert {}.obj", &name).as_str());
-//                     (name, data)
-//                 }
-//             )
-//         ))
-//     }
-// }
+pub type ModelMapper = HashMap<String, ModelData>;
+impl RawAssetMapper for ModelMapper {
+    fn load(&mut self, asset_dir: &PathBuf) {
+        crate::util::generic_load(self, asset_dir, "models", "obj",);
+    }
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap<'a> {
+        crate::util::generic_to_asset_map(*self, builder)
+    }
+    fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {
+        crate::util::generic_load_bin_map(self, bin_map);
+    }
+    fn to_bin_map(self: Box<Self>) -> BincodeAssetMap {
+        crate::util::generic_to_bin_map(*self)
+    }
+}

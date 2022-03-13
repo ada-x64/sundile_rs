@@ -14,3 +14,7 @@ bytemuck = "*"
 naga = "*"
 
 sundile_graphics = { path = "../graphics/" }
+
+[dev-dependencies]
+winit = "*"
+futures = "*"

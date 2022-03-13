@@ -18,7 +18,7 @@ pub struct Renderer<'a> {
 
 impl<'a> Renderer<'a> {
 
-    pub fn new(render_target: &RenderTarget, assets: &mut Assets, viewport: Option<Viewport>) -> Self {
+    pub fn new(render_target: &RenderTarget, assets: &mut AssetTypeMap, viewport: Option<Viewport>) -> Self {
         //
         // Setup
         //
@@ -59,7 +59,7 @@ impl<'a> Renderer<'a> {
             label: Some("Model Pipeline"),
             layout: Some(&model_bind_group_layout),
             vertex: wgpu::VertexState {
-                module: &assets.shaders["default"],
+                module: assets.asset("shaders", "default"),
                 entry_point: "vs_main",
                 buffers: &[
                     ModelVertex::desc(),
@@ -67,7 +67,7 @@ impl<'a> Renderer<'a> {
                 ]
             },
             fragment: Some(wgpu::FragmentState {
-                module: &assets.shaders["default"],
+                module: &assets["shaders"]["default"],
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
                     format: config.format,
@@ -103,18 +103,6 @@ impl<'a> Renderer<'a> {
             (name.to_owned(), InstanceCache::new())
         });
         let mut instance_cache_map = HashMap::from_iter(cache_iter);
-
-        //TODO: REMOVE ME
-        let model = slib_terrain::temp_model(&assets, &render_target);
-        assets.models.insert("terrain".to_string(), model);
-
-        use cgmath::*;
-        let mut cache = InstanceCache::new();
-        cache.insert(Instance {
-            position: cgmath::Vector3::zero(),
-            rotation: cgmath::Quaternion::zero(),
-        });
-        instance_cache_map.insert("terrain".to_string(), cache);
 
         Renderer {
             viewport,

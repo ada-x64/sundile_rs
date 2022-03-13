@@ -6,28 +6,24 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# general
+futures = "*"
+anyhow = "*"
+
+# rendering 
 winit = "*"
 wgpu = "*"
 bytemuck = "*"
 cgmath = "*"
-futures = "*"
-anyhow = "*"
-
-chrono = "*"
-
-legion = "*"
-
-egui = "0.16"
-egui_wgpu_backend = "0.16"
-egui_winit_platform = "0.13"
-epi = "0.16"
-
 wgpu_glyph = "0.16.0"
 
+# ecs
+legion = "*"
+
+# assets
 bincode = "*"
 
+# internal
 sundile_graphics = {path = "../graphics/"}
 sundile_assets = { path = "../assets/" }
-
-# FOR TESTING ONLY
-slib_terrain = { path = "../../lib/terrain" }
+sundile_scripting = { path = "../scripting/" }

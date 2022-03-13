@@ -1,5 +1,49 @@
 use crate::*;
 
+pub struct HeadlessRenderTarget {
+    pub adapter: wgpu::Adapter,
+	pub device: wgpu::Device,
+	pub queue: wgpu::Queue,
+    pub instance: wgpu::Instance,
+}
+impl HeadlessRenderTarget {
+    pub async fn new(enable_tracing:bool, label: Option<&str>) -> Self {
+        let instance = wgpu::Instance::new(wgpu::Backends::all());
+        let adapter = instance.request_adapter(
+            &wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: None,
+                force_fallback_adapter: false,
+            },
+        ).await.unwrap();
+
+        let mut trace_path = None;
+        let dir = format!("./dbg/trace/{}__{}", chrono::Local::now().timestamp(), label.unwrap_or_else(|| "UNLABLED"));
+        let path = std::path::Path::new(&*dir);
+        if enable_tracing {
+            std::fs::create_dir_all(&path).expect("Unable to create tracing path!");
+            trace_path = Some(path);
+        }
+
+        let (device, queue) = adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                features: wgpu::Features::SPIRV_SHADER_PASSTHROUGH,
+                limits: wgpu::Limits::default(),
+                label,
+            },
+            trace_path,
+        ).await.unwrap();
+
+        Self {
+            adapter,
+            device,
+            queue,
+            instance,
+        }
+    }
+}
+
+
 pub struct RenderTarget {
     pub adapter: wgpu::Adapter,
 	pub config: wgpu::SurfaceConfiguration,

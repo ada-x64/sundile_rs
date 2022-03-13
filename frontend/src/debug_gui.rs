@@ -1,21 +1,29 @@
-use winit::{event::*, window::*};
 use sundile_graphics::prelude::*;
+use sundile_core::game::Game;
+
+use winit::{event::*, window::*};
 use egui_winit_platform::*;
 use egui_wgpu_backend::*;
 use std::time::*;
 
-use super::game::Game;
-
 //Ref: https://github.com/hasenbanck/egui_example/blob/master/src/main.rs
+
+/// This trait enables libraries to plug-in windows to the debug gui.
+pub trait DebugWindow {
+    /// Internally calls the egui::Window.show() function.
+    fn show(&self);
+}
 
 pub struct DebugGui {
     platform: Platform,
     render_pass: RenderPass,
     start_time: Instant,
+    debug_windows: Vec<Box<dyn DebugWindow>>,
+    open: bool,
 }
 
 impl DebugGui {
-    pub fn new(render_target: &RenderTarget, window: &Window) -> Self {
+    pub fn new(render_target: &RenderTarget, window: &Window, debug_windows: Vec<Box<dyn DebugWindow>>, open: bool) -> Self {
         let size = window.inner_size();
 
         let platform = Platform::new(PlatformDescriptor {
@@ -36,6 +44,8 @@ impl DebugGui {
             platform,
             render_pass,
             start_time: Instant::now(),
+            debug_windows,
+            open,
         }
     }
 
@@ -96,8 +106,15 @@ impl DebugGui {
         use egui::*;
 
         SidePanel::left("0").show(&ctx, |_ui| {
+            //list available debug windows
             // ui.label(format!("{:?}", &game.renderer.viewport));
             // ui.label(format!("{:?}", &game.renderer.camera_wrapper));
         });
+
+        // Iterate through debug windows...
+        //TODO: Add state to `DebugWindow`s.
+        for window in &self.debug_windows {
+            window.show();
+        }
     }
 }

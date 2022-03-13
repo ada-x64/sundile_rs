@@ -1,7 +1,9 @@
 [workspace]
+resolver = "2"
 members = [
     "assets",
     "graphics",
-    "scripting",
     "core",
+    "scripting",
+    "frontend",
 ]

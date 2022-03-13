@@ -143,7 +143,7 @@ pub struct Renderer2d<'a> {
 
 #[allow(dead_code)]
 impl<'a> Renderer2d<'a> {
-    pub fn new(render_target: &RenderTarget, assets: &Assets,) -> Self {
+    pub fn new(render_target: &RenderTarget, assets: &AssetTypeMap,) -> Self {
         let (device, config, ) = (
             &render_target.device,
             &render_target.config,

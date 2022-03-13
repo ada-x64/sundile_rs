@@ -11,7 +11,7 @@ fn test_serialize() {
     ));
 
     let mut registry = Registry::<String>::default();
-    components::register(&mut registry);
+    crate::components::register(&mut registry);
 
     let ron = ron::ser::to_string_pretty(&world.as_serializable(
         legion::any(),
@@ -25,11 +25,11 @@ fn test_serialize() {
 
 }
 
-#[test]
-fn test_deserialize() {
-    use legion::{*, serialize::*};
-    use crate::components::*;
+// #[test]
+// fn test_deserialize() {
+//     use legion::{*, serialize::*};
+//     use crate::components::*;
 
-    let data = ron::from_str::<Vec<dyn Component>>(include_str!("./example_scene.ron")).unwrap();
-    todo!()
-}
+//     let data = ron::from_str::<Vec<dyn Component>>(include_str!("./example_scene.ron")).unwrap();
+//     todo!()
+// }
