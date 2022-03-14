@@ -59,7 +59,7 @@ impl<'a> Renderer<'a> {
             label: Some("Model Pipeline"),
             layout: Some(&model_bind_group_layout),
             vertex: wgpu::VertexState {
-                module: assets.asset("shaders", "default"),
+                module: assets.get_asset("shaders", "default"),
                 entry_point: "vs_main",
                 buffers: &[
                     ModelVertex::desc(),
@@ -67,7 +67,7 @@ impl<'a> Renderer<'a> {
                 ]
             },
             fragment: Some(wgpu::FragmentState {
-                module: &assets["shaders"]["default"],
+                module: assets.get_asset("shaders", "default"),
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
                     format: config.format,
@@ -99,10 +99,10 @@ impl<'a> Renderer<'a> {
             multiview: None,
         });
 
-        let cache_iter = assets.models.iter().map(|(name, _)| {
+        let cache_iter = assets["models"].iter().map(|(name, _)| {
             (name.to_owned(), InstanceCache::new())
         });
-        let mut instance_cache_map = HashMap::from_iter(cache_iter);
+        let instance_cache_map = HashMap::from_iter(cache_iter);
 
         Renderer {
             viewport,
@@ -133,7 +133,7 @@ impl<'a> Renderer<'a> {
         self.camera_wrapper.handle_input(event);
     }
     
-    pub fn render(&mut self, render_target: &mut RenderTarget, _world: &World, assets: &Assets) {
+    pub fn render(&mut self, render_target: &mut RenderTarget, _world: &World, assets: &AssetTypeMap) {
         //
         // Setup
         //
@@ -165,7 +165,7 @@ impl<'a> Renderer<'a> {
 
         render_pass.set_pipeline(&self.model_pipeline);
         for (name, cache) in &mut self.instance_cache_map {
-            cache.render(&mut render_pass, &assets.models[name], camera_bind_group, &light_bind_group);
+            cache.render(&mut render_pass, &assets.get_asset("models", &name), camera_bind_group, &light_bind_group);
         }
     }   
 }

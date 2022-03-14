@@ -187,12 +187,12 @@ impl<'a> Renderer2d<'a> {
             label: Some("Renderer2D Pipeline"),
             layout: Some(&layout),
             vertex: VertexState {
-                module: &assets.shaders["2d"],
+                module: assets.get_asset("shaders", "2d"),
                 entry_point: "vs_main",
                 buffers: &[Vert2d::desc()],
             },
             fragment: Some(FragmentState {
-                module: &assets.shaders["2d"],
+                module: assets.get_asset("shaders", "2d"),
                 entry_point: "fs_main",
                 targets: &[ColorTargetState {
                     format: config.format,
@@ -218,10 +218,10 @@ impl<'a> Renderer2d<'a> {
             multiview: None,
         });
 
-        let text_wrapper = TextWrapper::new(&render_target, assets.fonts.clone());
+        let text_wrapper = TextWrapper::new(&render_target, HashMap::new()); //TODO: IMPLEMENT THIS assets.fonts.clone());
 
         Self {
-            texture_atlas: TextureAtlas::new(&render_target, &texture_bind_group_layout, &assets.textures["atlas_0"][..]),
+            texture_atlas: TextureAtlas::new(&render_target, &texture_bind_group_layout, &[]), //TODO: IMPLEMENT THIS &assets.textures["atlas_0"][..]),
             queue: vec![],
             pipeline,
             color: sundile_graphics::Color::from_rgb(1.0, 1.0, 1.0),

@@ -3,11 +3,12 @@ mod raw;
 mod util;
 pub mod prelude {
     pub use crate::types::*;
-    pub use crate::raw::*;
+    pub use crate::raw::{
+        model::ModelMapper,
+        shader::ShaderMapper,
+    };
     pub use crate::*;
 }
-#[cfg(test)]
-mod tests;
 
 use std::collections::HashMap;
 use std::path::*;
@@ -35,13 +36,13 @@ impl<'a> Serializer<'a> {
         self
     }
     /// Sets the output directory. Data will be serialized to out_dir/data.bin.
-    /// The default out_path is the current directory.
+    /// The default out_path is "./".
     pub fn with_out_path<P>(mut self, path: P) -> Self where P : Into<PathBuf> {
         self.out_path = Some(path.into());
         self
     }
     /// Sets the asset directory. The asset compiler should then load data from asset_directory/(asset_type)/*.type_extension
-    /// The default in path is ./assets/
+    /// The default in path is "./assets/"
     pub fn with_asset_directory<P>(mut self, path: P) -> Self where P : Into<PathBuf> {
         self.asset_directory = Some(path.into());
         self
@@ -50,10 +51,10 @@ impl<'a> Serializer<'a> {
     // TODO: Should this function be responsible for caching or should we shunt that to the individual asset compilers?
     pub fn serialize(self) -> Vec<u8> {
         let out_path = self.out_path
-            .unwrap_or(std::env::current_dir().expect("Unable to get current directory!"))
+            .unwrap_or("./".into())
             .join("data.bin");
         let in_path = self.asset_directory
-            .unwrap_or(std::env::current_dir().expect("Unable to get current directory!").join("/assets/"));
+            .unwrap_or("./assets/".into());
 
         let mut out_map = BincodeAssetTypeMap::new();
         for (name, mut mapper) in self.mappers {
@@ -104,8 +105,8 @@ impl<'a> Deserializer<'a> {
         self
     }
     /// Parses the bin. May panic if it cannot parse the binary into an AssetTypeMap or if no mapper exists for an asset type within that binary.
-    pub fn deserialize<'f, BuilderType>(self, bin: &[u8], asset_builder: BuilderType) -> AssetTypeMap<'f>
-    where BuilderType: Into<AssetBuilder<'f>> {
+    pub fn deserialize<'f, BuilderType>(self, bin: &[u8], asset_builder: &'f BuilderType) -> AssetTypeMap
+    where &'f BuilderType: Into<AssetBuilder<'f>> {
         let builder = asset_builder.into();
         let mut map_in = bincode::deserialize::<BincodeAssetTypeMap>(bin).expect("Unable to read bin!");
         let mut map_out = AssetTypeMap::new();

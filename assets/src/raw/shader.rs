@@ -12,12 +12,6 @@ use naga::{
 
 use crate::prelude::*;
 
-impl Asset for ShaderModule {
-    fn get_type_name(&self) -> &'static str {
-        "ShaderModule"
-    }
-}
-
 pub type ShaderData = Vec<u32>;
 
 impl RawAsset<ShaderModule> for ShaderData {
@@ -59,7 +53,7 @@ impl RawAssetMapper for ShaderMapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "shaders", "wgsl");
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap<'a> {
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
         crate::util::generic_to_asset_map(*self, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {

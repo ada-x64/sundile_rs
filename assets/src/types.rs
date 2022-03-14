@@ -1,5 +1,7 @@
+use std::any::*;
 use std::collections::HashMap;
 use std::path::*;
+use anyhow::*;
 
 use sundile_graphics::prelude::HeadlessRenderTarget;
 use sundile_graphics::render_target::RenderTarget;
@@ -8,23 +10,25 @@ use sundile_graphics::render_target::RenderTarget;
 // The below types deal with Assets as they are presented to the game.
 // ---
 
-//TODO: Create crate for proc_macro.
-/// Asset trait required for types to be handled by [AssetMap] / [AssetTypeMap].
-pub trait Asset {
-    fn get_type_name(&self) -> &'static str;
-}
+
+/// Asset type alias required for [AssetMap] / [AssetTypeMap].
+pub type Asset = Box<dyn Any>;
 
 /// Maps assets of a particular type. Typically used inside of [AssetTypeMap].
 /// Because we want [AssetTypeMap] to be extensible, this type takes in a type that satisfies the Asset trait.
-pub type AssetMap<'a> = HashMap<String, Box<dyn Asset + 'a>>;
-/// Maps assets in the pattern `asset_map["asset_type"]["asset_name"]`, e.g. `asset_map["models"]["test_cube"]`
-pub type AssetTypeMap<'a> = HashMap<String, AssetMap<'a>>;
+pub type AssetMap = HashMap<String, Asset>;
+
+/// Typemap for assets.
+pub type AssetTypeMap = HashMap<String, AssetMap>;
 pub trait AssetTypeMapFns {
     fn combine(&mut self, other: Self);
-    fn asset<'f, S, T>(&'f self, asset_type_name: S, asset_name: S) -> T where S : Into<String>, T: From<&'f Box<dyn Asset + 'f>>;
+    fn try_get_asset<S, T>(&self, ty: S, name: S) -> Result<&T> where S: Into<String>, T: 'static;
+    fn get_asset<S, T>(&self, ty: S, name: S) -> &T where S: Into<String>, T: 'static;
+    fn try_get_asset_mut<S, T>(&mut self, ty: S, name: S) -> Result<&mut T> where S: Into<String>, T: 'static;
+    fn get_asset_mut<S, T>(&mut self, ty: S, name: S) -> &mut T where S: Into<String>, T: 'static;
 }
-impl<'a> AssetTypeMapFns for AssetTypeMap<'a> {
-    fn combine(&mut self, other: AssetTypeMap<'a>) {
+impl AssetTypeMapFns for AssetTypeMap {
+    fn combine(&mut self, other: AssetTypeMap) {
         for (asset_type, new_map) in other.into_iter() {
             match self.get_mut(&asset_type) {
                 Some(old_map) => {
@@ -36,9 +40,45 @@ impl<'a> AssetTypeMapFns for AssetTypeMap<'a> {
             }
         }
     }
-    
-    fn asset<'f, S, T>(&'f self, asset_type_name: S, asset_name: S) -> T where S : Into<String>, T: From<&'f Box<dyn Asset + 'f>> {
-        self.get(&asset_type_name.into()).unwrap().get(&asset_name.into()).unwrap().into()
+    fn try_get_asset<S, T>(&self, ty: S, name: S) -> Result<&T> where S: Into<String>, T: 'static {
+        let ty_str: String = ty.into();
+        let name_str: String = name.into();
+
+        match self.get(&ty_str) {
+            Some(map) => match map.get(&name_str) {
+                Some(asset_box) => {
+                    match asset_box.downcast_ref() {
+                        Some(asset) => Ok(asset),
+                        None => Err(anyhow!("Cannot convert to specified type!"))
+                    }
+                }
+                None => Err(anyhow!("Cannot find asset with name {}", &name_str)),
+            }
+            None => Err(anyhow!("Cannot find asset type with name {}", &ty_str)),
+        }
+    }
+    fn get_asset<S, T>(&self, ty: S, name: S) -> &T where S: Into<String>, T: 'static {
+        self.try_get_asset(ty, name).unwrap()
+    }
+    fn try_get_asset_mut<S, T>(&mut self, ty: S, name: S) -> Result<&mut T> where S: Into<String>, T: 'static {
+        let ty_str: String = ty.into();
+        let name_str: String = name.into();
+
+        match self.get_mut(&ty_str) {
+            Some(map) => match map.get_mut(&name_str) {
+                Some(asset_box) => {
+                    match asset_box.downcast_mut() {
+                        Some(asset) => Ok(asset),
+                        None => Err(anyhow!("Cannot convert to specified type!"))
+                    }
+                }
+                None => Err(anyhow!("Cannot find asset with name {}", &name_str)),
+            }
+            None => Err(anyhow!("Cannot find asset type with name {}", &ty_str)),
+        }
+    }
+    fn get_asset_mut<S, T>(&mut self, ty: S, name: S) -> &mut T where S: Into<String>, T: 'static {
+        self.try_get_asset_mut(ty, name).unwrap()
     }
 }
 
@@ -59,7 +99,7 @@ pub type BincodeAssetTypeMap = HashMap<String, BincodeAssetMap>;
 
 /// Represents an [Asset] as loaded directly from disk.
 /// This is an intermediary form, which should be converted to Asset types and loaded into [AssetMap]s.
-pub trait RawAsset<AssetType> where AssetType : Asset {
+pub trait RawAsset<AssetType> where AssetType : Any {
     /// Loads an individual asset from disk and stores it in this type.
     fn from_disk(path: &PathBuf) -> Self;
     /// Converts this type to the AssetType to be used with the engine.
@@ -72,7 +112,7 @@ pub trait RawAssetMapper {
     /// Tip: call RawAsset::load_from_disk internally.
     fn load(&mut self, asset_dir: &PathBuf);
     /// Converts from raw data to the representation used in-game.
-    fn to_asset_map<'a>(self: Box<Self>, asset_builder: &AssetBuilder) -> AssetMap<'a>;
+    fn to_asset_map<'a>(self: Box<Self>, asset_builder: &AssetBuilder) -> AssetMap;
     /// Deserializes from bytecode into raw asset data.
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap);
     /// Serializes self from raw asset data to bytecode

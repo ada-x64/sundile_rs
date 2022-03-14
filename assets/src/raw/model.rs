@@ -8,12 +8,6 @@ use serde::*;
 use crate::prelude::*;
 use sundile_graphics::prelude::*;
 
-impl Asset for Model {
-    fn get_type_name(&self) -> &'static str {
-        "Model"
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct MaterialData {
     pub name: String,
@@ -239,7 +233,7 @@ impl RawAssetMapper for ModelMapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "models", "obj",);
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap<'a> {
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
         crate::util::generic_to_asset_map(*self, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {
