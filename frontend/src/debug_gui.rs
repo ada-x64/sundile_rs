@@ -11,7 +11,7 @@ use std::time::*;
 /// This trait enables libraries to plug-in windows to the debug gui.
 pub trait DebugWindow {
     /// Internally calls the egui::Window.show() function.
-    fn show(&self);
+    fn show(&self, ctx: &egui::CtxRef);
 }
 
 pub struct DebugGui {
@@ -19,7 +19,7 @@ pub struct DebugGui {
     render_pass: RenderPass,
     start_time: Instant,
     debug_windows: Vec<Box<dyn DebugWindow>>,
-    open: bool,
+    pub open: bool,
 }
 
 impl DebugGui {
@@ -114,7 +114,7 @@ impl DebugGui {
         // Iterate through debug windows...
         //TODO: Add state to `DebugWindow`s.
         for window in &self.debug_windows {
-            window.show();
+            window.show(ctx);
         }
     }
 }

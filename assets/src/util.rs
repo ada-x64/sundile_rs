@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use std::path::*;
 use std::any::Any;
 
-use crate::types::*;
+use crate::internal_types::*;
 
 /// Recursively searches the directory for any files with the matching extension.
 /// Returns a Result containing a vector with every found path.
@@ -41,11 +41,13 @@ where RawAssetType: RawAsset<AssetType>, AssetType: Any {
 pub fn generic_to_asset_map<'a, 'f, RawAssetType, AssetType>
 (mapper: HashMap<String, RawAssetType>, builder: &AssetBuilder<'f>, ) -> AssetMap
 where RawAssetType: RawAsset<AssetType>, AssetType: Any {
-    AssetMap::from_iter(
-        mapper.into_iter().map(
-            |(name, data)| -> (String, Box<dyn Any>) {
-                (name.to_owned(), Box::new(data.to_asset(&builder)))
-            }
+    AssetMap::from_map(
+        HashMap::<String, AssetType>::from_iter(
+            mapper.into_iter().map(
+                |(name, data)| -> (String, AssetType) {
+                    (name, data.to_asset(&builder))
+                }
+            )
         )
     )
 }

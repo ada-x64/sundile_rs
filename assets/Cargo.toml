@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "*"
+thiserror = "*"
 bincode = "*"
 serde = {version = "*", features = ["derive"]}
 tobj = "*"

@@ -20,7 +20,7 @@ pub struct Game<'a> {
 
 impl<'a> Game<'a> {
     //TODO: mut Assets temporary?
-    pub fn new(render_target: &RenderTarget, assets: &mut AssetTypeMap, scenes: SceneMap, viewport: Option<Viewport>, paused: bool) -> Self  {
+    pub fn new(render_target: &RenderTarget, assets: &'a mut AssetTypeMap, scenes: SceneMap, viewport: Option<Viewport>, paused: bool) -> Self  {
         let renderer = Renderer::new(&render_target, assets, viewport);
         let renderer2d = Renderer2d::new(&render_target, &assets,);
 

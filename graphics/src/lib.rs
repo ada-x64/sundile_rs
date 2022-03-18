@@ -7,6 +7,7 @@ pub mod instance;
 pub mod light;
 pub mod render_target;
 pub mod text;
+pub mod texture_atlas;
 
 pub mod prelude {
     pub use crate::{
@@ -18,8 +19,10 @@ pub mod prelude {
         light::*,
         render_target::*,
         text::*,
+        texture_atlas::*,
     };
 }
+pub use prelude::*;
 
 /************************************************
  * General structs
@@ -27,6 +30,7 @@ pub mod prelude {
 pub trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 }
+
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {

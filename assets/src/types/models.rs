@@ -228,8 +228,8 @@ impl RawAsset<Model> for ModelData {
 }
 
 
-pub type ModelMapper = HashMap<String, ModelData>;
-impl RawAssetMapper for ModelMapper {
+pub type Mapper = HashMap<String, ModelData>;
+impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "models", "obj",);
     }

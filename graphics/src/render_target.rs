@@ -51,6 +51,7 @@ pub struct RenderTarget {
 	pub queue: wgpu::Queue,
     pub instance: wgpu::Instance,
 	pub surface: wgpu::Surface,
+    pub texture_layout: wgpu::BindGroupLayout,
 
     pub surface_texture: Option<wgpu::SurfaceTexture>,
     pub encoder: Option<wgpu::CommandEncoder>,
@@ -87,6 +88,8 @@ impl RenderTarget {
             trace_path,
         ).await.unwrap();
 
+        let texture_layout = Texture::get_bind_group_layout(&device);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface.get_preferred_format(&adapter).unwrap(),
@@ -104,6 +107,7 @@ impl RenderTarget {
             queue,
             instance,
             surface,
+            texture_layout,
 
             surface_texture: None,
             encoder: None,

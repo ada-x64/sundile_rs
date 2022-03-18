@@ -50,77 +50,6 @@ impl Vertex for Vert2d {
     }
 }
 
-/// Sprite struct. Always contained within a TextureAtlas.
-#[allow(dead_code)]
-pub struct Sprite {
-    frames: Vec<[u32;2]>, //xy in pixel coordinates on the texture
-    width: u32,
-    height: u32,
-    num_frames: f32,
-    pub frame: f32,
-    pub fps: f32,
-}
-#[allow(dead_code)]
-impl Sprite {
-    pub fn new(frames: Vec<[u32;2]>, width: u32, height: u32, num_frames: f32, fps: f32) -> Self {
-        Self {
-            frames,
-            num_frames,
-            width,
-            height,
-            frame: 0.0,
-            fps,
-        }
-    }
-    pub fn update(&mut self, dt: f32) {
-        if self.num_frames > 0.0 {
-            self.frame += self.fps * dt;
-            if self.frame > self.num_frames {
-                self.frame -= self.num_frames;
-            }
-        }
-    }
-    pub fn current_frame(&self) -> [u32;2] {
-        self.frames[self.frame.floor() as usize]
-    }
-}
-
-struct TextureAtlas { //Move this into assets library.
-    texture: texture::Texture,
-    bind_group: BindGroup,
-    sprites: HashMap<&'static str, Sprite>,
-}
-impl TextureAtlas {
-    pub fn new(render_target: &RenderTarget, texture_bind_group_layout: &BindGroupLayout, bytes: &[u8]) -> Self {
-        //let texture = texture::Texture::load(&render_target.device, &render_target.queue, "assets/textures/atlas_0.png", false).expect("Unable to create texture atlas!");
-        let texture = texture::Texture::from_bytes(&render_target.device, &render_target.queue, bytes, "2D Texture Atlas", false).expect("Unable to create texture atlas!");
-
-        let bind_group = render_target.device.create_bind_group(&BindGroupDescriptor {
-            label: Some("2D Texture Atlas Bind Group"),
-            layout: &texture_bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(&texture.view),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::Sampler(&texture.sampler),
-                }
-            ],
-        });
-
-        Self {
-            texture,
-            bind_group,
-            sprites: HashMap::from_iter(vec![
-                ("default", Sprite::new(vec![[0,0]], 16, 16, 1.0, 0.0) ), 
-                ("circle", Sprite::new(vec![[16,0]], 16, 16, 1.0, 0.0) ),
-            ]),
-        }
-    }
-}
-
 struct Quad<'a> {
     sprite: Option<&'a str>,
     vertices: [f32;4],
@@ -143,7 +72,7 @@ pub struct Renderer2d<'a> {
 
 #[allow(dead_code)]
 impl<'a> Renderer2d<'a> {
-    pub fn new(render_target: &RenderTarget, assets: &AssetTypeMap,) -> Self {
+    pub fn new(render_target: &RenderTarget, assets: &'a mut AssetTypeMap,) -> Self {
         let (device, config, ) = (
             &render_target.device,
             &render_target.config,
@@ -218,10 +147,24 @@ impl<'a> Renderer2d<'a> {
             multiview: None,
         });
 
-        let text_wrapper = TextWrapper::new(&render_target, HashMap::new()); //TODO: IMPLEMENT THIS assets.fonts.clone());
+        let text_wrapper = TextWrapper::new(&render_target, assets.take_asset_map("fonts"));
+
+        // let texture_atlas = TextureAtlasBuilder::new()
+        //     .with_sprite_sheet("atlas_0", assets.get_asset("textures", "atlas_0"), SpriteSheet::new(16,16,0,0,0,0))
+        //     .build();
+
+        let texture_atlas = TextureAtlas::new(
+            render_target,
+            &texture_bind_group_layout,
+            assets.get_asset("textures", "atlas_0"),
+            HashMap::from_iter([
+                ("default".into(), Sprite::new(vec![[0,0]], 16,16, 1, 0.0)),
+                ("circle".into(), Sprite::new(vec![[16,0]], 16, 16, 1, 0.0)),
+            ])
+        );
 
         Self {
-            texture_atlas: TextureAtlas::new(&render_target, &texture_bind_group_layout, &[]), //TODO: IMPLEMENT THIS &assets.textures["atlas_0"][..]),
+            texture_atlas,
             queue: vec![],
             pipeline,
             color: sundile_graphics::Color::from_rgb(1.0, 1.0, 1.0),
@@ -241,7 +184,7 @@ impl<'a> Renderer2d<'a> {
         let mut indices: Vec<u32> = vec![];
 
         while let Some(quad) = self.queue.pop() {
-            let sprite = &self.texture_atlas.sprites[quad.sprite.unwrap_or("default")];
+            let sprite = &self.texture_atlas.spritemap[quad.sprite.unwrap_or("default")];
 
             let tw = self.texture_atlas.texture.size.width as f32;
             let th = self.texture_atlas.texture.size.height as f32;
@@ -351,7 +294,7 @@ impl<'a> Renderer2d<'a> {
 
     /// Draw a sprite at the given pixel coordinates, with top-left at (0,0).
     pub fn draw_sprite(&mut self, x:f32, y:f32, width_multiplier:f32, height_multiplier:f32, sprite: &'static str) {
-        let spr = &self.texture_atlas.sprites[sprite]; //TODO: Don't borrow the sprite here for performance reasons?
+        let spr = &self.texture_atlas.spritemap[sprite]; //TODO: Don't borrow the sprite here for performance reasons?
         let spr_width = spr.width as f32;
         let spr_height = spr.height as f32;
         let sw = self.screen_size[0] as f32;

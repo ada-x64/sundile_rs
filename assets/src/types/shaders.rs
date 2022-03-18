@@ -47,9 +47,9 @@ impl RawAsset<ShaderModule> for ShaderData {
     }
 }
 
-pub type ShaderMapper = HashMap<String, ShaderData>;
+pub type Mapper = HashMap<String, ShaderData>;
 
-impl RawAssetMapper for ShaderMapper {
+impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "shaders", "wgsl");
     }

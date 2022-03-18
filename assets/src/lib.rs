@@ -1,12 +1,8 @@
-mod types;
-mod raw;
-mod util;
+mod internal_types;
+pub mod util;
+pub mod types;
 pub mod prelude {
-    pub use crate::types::*;
-    pub use crate::raw::{
-        model::ModelMapper,
-        shader::ShaderMapper,
-    };
+    pub use crate::internal_types::*;
     pub use crate::*;
 }
 
@@ -75,8 +71,10 @@ impl<'a> Serializer<'a> {
 impl<'a> Default for Serializer<'a> {
     fn default() -> Self {
         Self::new()
-            .with_mapper("shader", raw::shader::ShaderMapper::new())
-            .with_mapper("model", raw::model::ModelMapper::new())
+            .with_mapper("shaders", types::shaders::Mapper::new())
+            .with_mapper("models", types::models::Mapper::new())
+            .with_mapper("textures", types::textures::Mapper::new())
+            .with_mapper("fonts", types::fonts::Mapper::new())
             //etc
     }
 }
@@ -117,7 +115,7 @@ impl<'a> Deserializer<'a> {
                 None => continue
             };
             mapper.load_bin_map(bin_map);
-            map_out.insert(name, mapper.to_asset_map(&builder));
+            map_out.insert_asset_map(name, mapper.to_asset_map(&builder));
         }
 
         if !map_in.is_empty() && self.panic {
@@ -131,8 +129,10 @@ impl<'a> Deserializer<'a> {
 impl<'a> Default for Deserializer<'a> {
     fn default() -> Self {
         Self::new()
-            .with_mapper("shader", raw::shader::ShaderMapper::new())
-            .with_mapper("model", raw::model::ModelMapper::new())
+            .with_mapper("shaders", types::shaders::Mapper::new())
+            .with_mapper("models", types::models::Mapper::new())
+            .with_mapper("textures", types::textures::Mapper::new())
+            .with_mapper("fonts", types::fonts::Mapper::new())
             //etc
     }
 }
