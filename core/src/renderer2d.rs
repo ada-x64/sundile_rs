@@ -72,7 +72,7 @@ pub struct Renderer2d<'a> {
 
 #[allow(dead_code)]
 impl<'a> Renderer2d<'a> {
-    pub fn new(render_target: &RenderTarget, assets: &'a mut AssetTypeMap,) -> Self {
+    pub fn new(render_target: &RenderTarget, assets: &mut AssetTypeMap,) -> Self {
         let (device, config, ) = (
             &render_target.device,
             &render_target.config,
@@ -112,16 +112,18 @@ impl<'a> Renderer2d<'a> {
         //     source: ShaderSource::Wgsl(assets.shaders["2d"].clone().into()),
         // });
 
+        let shader = assets.try_get_asset::<wgpu::ShaderModule>("2d").unwrap();
+
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("Renderer2D Pipeline"),
             layout: Some(&layout),
             vertex: VertexState {
-                module: assets.get_asset("shaders", "2d"),
+                module: shader.as_ref(),
                 entry_point: "vs_main",
                 buffers: &[Vert2d::desc()],
             },
             fragment: Some(FragmentState {
-                module: assets.get_asset("shaders", "2d"),
+                module: shader.as_ref(),
                 entry_point: "fs_main",
                 targets: &[ColorTargetState {
                     format: config.format,
@@ -147,7 +149,7 @@ impl<'a> Renderer2d<'a> {
             multiview: None,
         });
 
-        let text_wrapper = TextWrapper::new(&render_target, assets.take_asset_map("fonts"));
+        let text_wrapper = TextWrapper::new(&render_target, assets.try_take_asset_map::<Font>().unwrap());
 
         // let texture_atlas = TextureAtlasBuilder::new()
         //     .with_sprite_sheet("atlas_0", assets.get_asset("textures", "atlas_0"), SpriteSheet::new(16,16,0,0,0,0))
@@ -156,7 +158,7 @@ impl<'a> Renderer2d<'a> {
         let texture_atlas = TextureAtlas::new(
             render_target,
             &texture_bind_group_layout,
-            assets.get_asset("textures", "atlas_0"),
+            assets.try_take_asset("atlas_0").unwrap(),
             HashMap::from_iter([
                 ("default".into(), Sprite::new(vec![[0,0]], 16,16, 1, 0.0)),
                 ("circle".into(), Sprite::new(vec![[16,0]], 16, 16, 1, 0.0)),

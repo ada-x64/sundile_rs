@@ -55,11 +55,13 @@ impl<'a> Renderer<'a> {
             push_constant_ranges: &[],
         });
 
+        let default_shader = assets.try_get_asset::<wgpu::ShaderModule>("default").unwrap();
+
         let model_pipeline =  device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Model Pipeline"),
             layout: Some(&model_bind_group_layout),
             vertex: wgpu::VertexState {
-                module: assets.get_asset("shaders", "default"),
+                module: default_shader.as_ref(),
                 entry_point: "vs_main",
                 buffers: &[
                     ModelVertex::desc(),
@@ -67,7 +69,7 @@ impl<'a> Renderer<'a> {
                 ]
             },
             fragment: Some(wgpu::FragmentState {
-                module: assets.get_asset("shaders", "default"),
+                module: default_shader.as_ref(),
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
                     format: config.format,
@@ -99,7 +101,8 @@ impl<'a> Renderer<'a> {
             multiview: None,
         });
 
-        let cache_iter = assets["models"].iter().map(|(name, _)| {
+        let list = assets.try_list_assets::<Model>().unwrap();
+        let cache_iter = list.iter().map(|name| {
             (name.to_owned(), InstanceCache::new())
         });
         let instance_cache_map = HashMap::from_iter(cache_iter);
@@ -156,16 +159,20 @@ impl<'a> Renderer<'a> {
         // Note: render_target _cannot_ be borrowed again once render_pass has been created.
         // Ensure that all processing is done before this point.
         //
-        let mut render_pass = render_target.get_render_pass(true, true);
+        
+        let model_map = assets.try_get_asset_map::<Model>().unwrap();
+        {
+            let mut render_pass = render_target.get_render_pass(true, true);
 
-        if self.viewport.is_some() {
-            let viewport = self.viewport.as_ref().unwrap();
-            render_pass.set_viewport(viewport.x, viewport.y, viewport.width, viewport.height, viewport.min_depth, viewport.max_depth);
-        }
+            if self.viewport.is_some() {
+                let viewport = self.viewport.as_ref().unwrap();
+                render_pass.set_viewport(viewport.x, viewport.y, viewport.width, viewport.height, viewport.min_depth, viewport.max_depth);
+            }
 
-        render_pass.set_pipeline(&self.model_pipeline);
-        for (name, cache) in &mut self.instance_cache_map {
-            cache.render(&mut render_pass, &assets.get_asset("models", &name), camera_bind_group, &light_bind_group);
+            render_pass.set_pipeline(&self.model_pipeline);
+            for (name, cache) in &mut self.instance_cache_map {
+                cache.render(&mut render_pass, model_map.get(name).unwrap().as_ref(), camera_bind_group, &light_bind_group);
+            }
         }
     }   
 }

@@ -115,7 +115,7 @@ impl<'a> Deserializer<'a> {
                 None => continue
             };
             mapper.load_bin_map(bin_map);
-            map_out.insert_asset_map(name, mapper.to_asset_map(&builder));
+            map_out.insert_asset_map(mapper.to_asset_map(&builder));
         }
 
         if !map_in.is_empty() && self.panic {

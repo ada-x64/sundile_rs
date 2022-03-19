@@ -3,26 +3,25 @@ use std::path::*;
 use std::fs::*;
 use std::io::Read;
 use crate::prelude::*;
+use sundile_graphics::*;
 
-pub type FontData = Vec<u8>;
-
-impl RawAsset<Vec<u8>> for FontData {
+impl RawAsset<Font> for Font {
     /// Loads in the font file as raw bytes.
     fn from_disk(path: &PathBuf) -> Self {
         let mut buffer = Vec::<u8>::new();
         let mut file = File::open(path).unwrap();
         file.read_to_end(&mut buffer).unwrap();
-        buffer
+        Self { data: buffer}
     }
 
     /// Simply returns the byte vector.
-    fn to_asset(self, _: &AssetBuilder) -> Vec<u8> {
+    fn to_asset(self, _: &AssetBuilder) -> Font {
         self
     }
 }
 
 pub struct Mapper {
-    map: HashMap<String, FontData>
+    map: HashMap<String, Font>
 }
 impl Mapper {
     pub fn new() -> Self {
@@ -34,15 +33,15 @@ impl Mapper {
 
 impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
-        crate::util::generic_load::<FontData, FontData>(&mut self.map, asset_dir, "fonts", "ttf");
+        crate::util::generic_load::<Font, Font>(&mut self.map, asset_dir, "fonts", "ttf");
     }
     fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
-        crate::util::generic_to_asset_map::<FontData, FontData>(self.map, builder)
+        crate::util::generic_to_asset_map::<Font, Font>(self.map, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {
-        crate::util::generic_load_bin_map::<FontData, FontData>(&mut self.map, bin_map);
+        crate::util::generic_load_bin_map::<Font, Font>(&mut self.map, bin_map);
     }
     fn to_bin_map(self: Box<Self>) -> BincodeAssetMap {
-        crate::util::generic_to_bin_map::<FontData, FontData>(self.map)
+        crate::util::generic_to_bin_map::<Font, Font>(self.map)
     }
 }

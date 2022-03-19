@@ -29,7 +29,7 @@ impl Engine {
             event_loop,
             window,
             mut render_target,
-            mut assets,
+            assets,
             scene_map,
             mut debug_gui) = (
             self.event_loop,
@@ -40,7 +40,7 @@ impl Engine {
             self.debug_gui
         );
 
-        let mut game = game::Game::new(&render_target, &mut assets, scene_map, None, !debug_gui.open);
+        let mut game = game::Game::new(&render_target, assets, scene_map, None, !debug_gui.open);
         let mut fps = 0.0;
         let mut prev_time = Instant::now();
      
@@ -60,9 +60,8 @@ impl Engine {
                     fps = fps*smoothing + (1.0-smoothing)/dt.as_secs_f64();
                     game.update(dt);
                     
-                    //TODO: Thread this process
                     render_target.begin_frame();
-                    game.render(&mut render_target, &assets);
+                    game.render(&mut render_target);
                     debug_gui.render(&mut render_target, &window, &game);
                     render_target.end_frame();
                 },

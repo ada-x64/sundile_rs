@@ -3,7 +3,6 @@ use sundile_graphics::prelude::*;
 use sundile_assets::prelude::*;
 use crate::debug_gui::*;
 use crate::Engine;
-use std::any::Any;
 use winit::{window::WindowBuilder, event_loop::EventLoop};
 
 /// Builder for the game engine. 
@@ -148,19 +147,8 @@ impl<'a> AssetTypeMapBuilder<'a> {
         }
     }
     /// Adds an asset. Will create a category for the associated type if needed.
-    pub fn with_asset<S>(mut self, ty: S, name: S, asset: impl Any) -> Self where S: Into<String> {
-        let s_name = name.into();
-        let s_type = ty.into();
-        match self.map.get_mut(&s_type) {
-            Some(value) => {
-                value.insert(s_name, Box::new(asset));
-            }
-            None => {
-                let mut submap = AssetMap::new();
-                submap.insert(s_name, Box::new(asset));
-                self.map.insert(s_type, submap);
-            }
-        }
+    pub fn with_asset<T>(mut self, name: &'a str, asset: T) -> Self where T: 'static {
+        self.map.try_insert_asset(name, asset).unwrap();
         self
     }
     
@@ -174,7 +162,7 @@ impl<'a> AssetTypeMapBuilder<'a> {
     pub(crate) fn build(mut self, render_target: &RenderTarget) -> AssetTypeMap {
         match self.deserializer {
             Some(de) => {
-                self.map.combine(de.deserialize(self.bin.unwrap(), render_target));
+                self.map.try_combine(de.deserialize(self.bin.unwrap(), render_target)).unwrap();
                 self.map
             }
             None => {

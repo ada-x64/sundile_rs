@@ -4,9 +4,16 @@
 
 use crate::prelude::*;
 use futures::{task::SpawnExt, executor::*};
+use serde::*;
 use wgpu::util::*;
 use wgpu_glyph::*;
 use std::collections::HashMap;
+
+/// Thin wrapper around a Vec<u8> of font data.
+#[derive(Serialize, Deserialize)]
+pub struct Font {
+    pub data: Vec<u8>
+}
 
 pub struct TextWrapper {
     staging_belt: StagingBelt,
@@ -18,7 +25,7 @@ pub struct TextWrapper {
 }
 
 impl TextWrapper {
-    pub fn new(render_target: &RenderTarget, raw_fonts: HashMap<String, Vec<u8>>) -> Self {
+    pub fn new(render_target: &RenderTarget, raw_fonts: HashMap<String, Font>) -> Self {
 
         let staging_belt = StagingBelt::new(1024);
         let local_pool = LocalPool::new();
@@ -26,9 +33,9 @@ impl TextWrapper {
 
         let mut fonts = HashMap::<String, FontId>::new();
         let mut font_data  = Vec::<ab_glyph::FontArc>::new();
-        for (name, data) in raw_fonts {
+        for (name, font) in raw_fonts {
             fonts.insert(name, FontId(font_data.len()));
-            font_data.push(ab_glyph::FontArc::try_from_vec(data.clone()).expect("Unable to register font!"));
+            font_data.push(ab_glyph::FontArc::try_from_vec(font.data.clone()).expect("Unable to register font!"));
         }
         let brush = GlyphBrushBuilder::using_fonts(font_data).build(&render_target.device, render_target.config.format);
 

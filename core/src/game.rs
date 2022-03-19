@@ -12,6 +12,7 @@ pub struct Game<'a> {
     pub renderer: Renderer<'a>,
     pub renderer2d: Renderer2d<'a>,
     pub paused: bool,
+    pub assets: AssetTypeMap,
     world: World,
     schedule: Schedule,
     resources: Resources,
@@ -20,9 +21,9 @@ pub struct Game<'a> {
 
 impl<'a> Game<'a> {
     //TODO: mut Assets temporary?
-    pub fn new(render_target: &RenderTarget, assets: &'a mut AssetTypeMap, scenes: SceneMap, viewport: Option<Viewport>, paused: bool) -> Self  {
-        let renderer = Renderer::new(&render_target, assets, viewport);
-        let renderer2d = Renderer2d::new(&render_target, &assets,);
+    pub fn new(render_target: &RenderTarget, mut assets: AssetTypeMap, scenes: SceneMap, viewport: Option<Viewport>, paused: bool) -> Self  {
+        let renderer = Renderer::new(&render_target, &mut assets, viewport);
+        let renderer2d = Renderer2d::new(&render_target, &mut assets,);
 
         let resources = Resources::default();
         // resources.insert(assets); // Don't send the entire assets struct here. Probably should access assets via some api.
@@ -34,6 +35,7 @@ impl<'a> Game<'a> {
             renderer,
             renderer2d,
             paused,
+            assets,
             world,
             schedule: Schedule::builder().build(), //TODO: Replace this with an actual script.
             resources,
@@ -47,9 +49,9 @@ impl<'a> Game<'a> {
         self.schedule.execute(&mut self.world, &mut self.resources,);
     }
 
-    pub fn render(&mut self, render_target: &mut RenderTarget, assets: &AssetTypeMap) {
+    pub fn render(&mut self, render_target: &mut RenderTarget) {
         if self.paused {return;}
-        self.renderer.render(render_target, &self.world, assets);
+        self.renderer.render(render_target, &self.world, &self.assets);
         self.renderer2d.render(render_target);
     }
 
