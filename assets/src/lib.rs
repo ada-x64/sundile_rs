@@ -9,7 +9,7 @@ pub mod prelude {
 use std::collections::HashMap;
 use std::path::*;
 
-use prelude::*;
+pub use prelude::*;
 
 /// Loads asset data into a binary. Intended to be used in build scripts to statically load assets.
 pub struct Serializer<'a> {
@@ -104,7 +104,7 @@ impl<'a> Deserializer<'a> {
     }
     /// Parses the bin. May panic if it cannot parse the binary into an AssetTypeMap or if no mapper exists for an asset type within that binary.
     pub fn deserialize<'f, BuilderType>(self, bin: &[u8], asset_builder: &'f BuilderType) -> AssetTypeMap
-    where &'f BuilderType: Into<AssetBuilder<'f>> {
+    where &'f BuilderType: Into<AssetBuildTarget<'f>> {
         let builder = asset_builder.into();
         let mut map_in = bincode::deserialize::<BincodeAssetTypeMap>(bin).expect("Unable to read bin!");
         let mut map_out = AssetTypeMap::new();

@@ -3,7 +3,6 @@ use winit;
 use sundile_graphics::prelude::*;
 use sundile_assets::prelude::*;
 use legion::*;
-use std::collections::HashMap;
 
 pub struct Renderer<'a> {
     pub viewport: Option<Viewport>,
@@ -12,8 +11,6 @@ pub struct Renderer<'a> {
     pub light_wrapper: LightWrapper<'a>,
     
 	model_pipeline: wgpu::RenderPipeline,
-
-    instance_cache_map: HashMap<String, InstanceCache>, // Maps models to instance caches by name
 }
 
 impl<'a> Renderer<'a> {
@@ -101,12 +98,6 @@ impl<'a> Renderer<'a> {
             multiview: None,
         });
 
-        let list = assets.try_list_assets::<Model>().unwrap();
-        let cache_iter = list.iter().map(|name| {
-            (name.to_owned(), InstanceCache::new())
-        });
-        let instance_cache_map = HashMap::from_iter(cache_iter);
-
         Renderer {
             viewport,
             
@@ -114,7 +105,6 @@ impl<'a> Renderer<'a> {
             light_wrapper,
     
             model_pipeline,
-            instance_cache_map,
         }
     }    
 
@@ -136,7 +126,7 @@ impl<'a> Renderer<'a> {
         self.camera_wrapper.handle_input(event);
     }
     
-    pub fn render(&mut self, render_target: &mut RenderTarget, _world: &World, assets: &AssetTypeMap) {
+    pub fn render(&mut self, render_target: &mut RenderTarget, _world: &World, assets: &mut AssetTypeMap) {
         //
         // Setup
         //
@@ -144,14 +134,9 @@ impl<'a> Renderer<'a> {
         let light_bind_group = self.light_wrapper.get_bind_group(&render_target.device);
         let camera_bind_group = &self.camera_wrapper.bind_group;
 
-        for (_, cache) in &mut self.instance_cache_map {
-            // use cgmath::*;
-            // cache.clear();
-            // cache.insert(Instance { //TEMP
-            //     position: Vector3::zero(),
-            //     rotation: Quaternion::zero(),
-            // });
-            cache.update(&render_target.device);
+        let mut model_map = assets.try_take_asset_map::<Model>().unwrap();
+        for (_, model) in &mut model_map {
+            model.instance_cache.update(&render_target.device);
         }
 
         // 
@@ -160,7 +145,6 @@ impl<'a> Renderer<'a> {
         // Ensure that all processing is done before this point.
         //
         
-        let model_map = assets.try_get_asset_map::<Model>().unwrap();
         {
             let mut render_pass = render_target.get_render_pass(true, true);
 
@@ -170,9 +154,11 @@ impl<'a> Renderer<'a> {
             }
 
             render_pass.set_pipeline(&self.model_pipeline);
-            for (name, cache) in &mut self.instance_cache_map {
-                cache.render(&mut render_pass, model_map.get(name).unwrap().as_ref(), camera_bind_group, &light_bind_group);
+            for (_, model) in &model_map {
+                model.render(&mut render_pass, &camera_bind_group, &light_bind_group);
             }
         }
+
+        assets.insert_map(model_map);
     }   
 }

@@ -17,7 +17,7 @@ impl RawAsset<Texture> for TextureData {
     }
 
     /// Creates a [Texture] from the serialized bytes.
-    fn to_asset(self, asset_builder: &AssetBuilder) -> Texture {
+    fn to_asset(self, asset_builder: &AssetBuildTarget) -> Texture {
         Texture::from_bytes(asset_builder.device, asset_builder.queue, &self[..], "statically loaded texture", false).expect("Unable to create texture!")
     }
 }
@@ -37,7 +37,7 @@ impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load::<TextureData, Texture>(&mut self.map, asset_dir, "textures", "png");
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
         //TODO: Compress this into a TextureAtlas
         crate::util::generic_to_asset_map::<TextureData, Texture>(self.map, builder)
     }

@@ -1,9 +1,10 @@
-use sundile_scripting::prelude::*;
-use sundile_graphics::prelude::*;
-use sundile_assets::prelude::*;
-use crate::debug_gui::*;
-use crate::Engine;
-use winit::{window::WindowBuilder, event_loop::EventLoop};
+pub use sundile_scripting::prelude::*;
+pub use sundile_graphics::prelude::*;
+pub use sundile_assets::prelude::*;
+pub use crate::debug_gui::*;
+pub use crate::Engine;
+pub use winit::{window::WindowBuilder, event_loop::EventLoop};
+use std::collections::HashMap;
 
 /// Builder for the game engine. 
 pub struct EngineBuilder<'a> {
@@ -11,7 +12,8 @@ pub struct EngineBuilder<'a> {
     render_target: Option<RenderTarget>,
     asset_typemap_builder: Option<AssetTypeMapBuilder<'a>>,
     scene_map_builder: Option<SceneMapBuilder>,
-    debug_gui_builder: Option<DebugGuiBuilder>,
+    debug_gui_builder: Option<DebugGuiBuilder<'a>>,
+    asset_builders: Vec<Box<dyn AssetBuilder + 'a>>,
 }
 impl<'a> EngineBuilder<'a> {
     /// Creates a new EngineBuilder.
@@ -22,6 +24,7 @@ impl<'a> EngineBuilder<'a> {
             asset_typemap_builder: None,
             scene_map_builder: None,
             debug_gui_builder: None,
+            asset_builders: vec![],
         }
     }
     /// Overrides the default window. For more info see [winit::WindowBuilder]
@@ -41,25 +44,34 @@ impl<'a> EngineBuilder<'a> {
     }
     /// Adds a [SceneMapBuilder], which will add scenes at build time.
     pub fn with_scenes(mut self, scene_map_builder: SceneMapBuilder) -> Self {
-        self.scene_map_builder = Some(self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).with_builder(scene_map_builder));
+        self.scene_map_builder = Some(self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).combine(scene_map_builder));
         self
     }
     /// Adds a debug_gui interface. Tip: Use DebugGuiBuilder.
-    pub fn with_debug_gui(mut self, debug_gui_builder: DebugGuiBuilder) -> Self {
-        self.debug_gui_builder = Some(debug_gui_builder);
+    pub fn with_debug_gui(mut self, debug_gui_builder: DebugGuiBuilder<'a>) -> Self {
+        self.debug_gui_builder = Some(self.debug_gui_builder.unwrap_or(DebugGuiBuilder::new()).combine(debug_gui_builder));
+        self
+    }
+    /// Adds an asset builder, which will run its build function on [EngineBuilder::build]
+    pub fn with_asset_builder(mut self, asset_builder: impl AssetBuilder + 'a) -> Self {
+        self.asset_builders.push(Box::new(asset_builder));
         self
     }
     /// Builds the game engine
-    pub fn build(self) -> Engine {
+    pub fn build(self) -> Engine<'a> {
 
         let event_loop = EventLoop::new();
         let window = self.window_builder.unwrap_or(WindowBuilder::new()).build(&event_loop).expect("Unable to build window!");
         let render_target = self.render_target.unwrap_or(
             futures::executor::block_on(RenderTarget::new(&window, false, Some("Default Render Target"))),
         );
-        let assets = self.asset_typemap_builder.unwrap_or(AssetTypeMapBuilder::new()).build(&render_target);
+        let mut assets = self.asset_typemap_builder.unwrap_or(AssetTypeMapBuilder::new()).build(&render_target);
         let debug_gui = self.debug_gui_builder.unwrap_or(DebugGuiBuilder::new()).build(&render_target, &window);
         let scene_map = self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).build();
+
+        for asset_builder in self.asset_builders {
+            asset_builder.build(&render_target, &mut assets);
+        }
 
         Engine {
             event_loop,
@@ -73,21 +85,21 @@ impl<'a> EngineBuilder<'a> {
 }
 
 /// Builder for DebugGui. Takes structs that implement DebugWindow and adds them to a list to be used internally.
-pub struct DebugGuiBuilder {
-    debug_windows: Vec<Box<dyn DebugWindow>>,
+pub struct DebugGuiBuilder<'a> {
+    debug_windows: HashMap<&'a str, Box<dyn DebugWindow>>,
     open: bool,
 }
-impl DebugGuiBuilder {
+impl<'a> DebugGuiBuilder<'a> {
     /// Creates a DebugGuiBuilder with no debug windows and default settings.
     pub fn new() -> Self {
         Self {
-            debug_windows: vec![],
+            debug_windows: HashMap::new(),
             open: false,
         }
     }
     /// Adds an externally defined debug window to the gui.
-    pub fn with_window(mut self, window: impl DebugWindow + 'static) -> Self {
-        self.debug_windows.push(Box::new(window));
+    pub fn with_window(mut self, name: &'a str, window: impl DebugWindow + 'static) -> Self {
+        self.debug_windows.insert(name, Box::new(window));
         self
     }
     /// Sets whether the debug gui is open at startup.
@@ -95,8 +107,14 @@ impl DebugGuiBuilder {
         self.open = open;
         self
     }
+    /// Combines two builders. The open status is set by ORing the values passed in.
+    pub fn combine(mut self, other: Self) -> Self {
+        self.debug_windows.extend(other.debug_windows);
+        self.open = self.open || other.open;
+        self
+    }
     /// Builds the debug gui. Should only be used internally.
-    pub(crate) fn build(self, render_target: &RenderTarget, window: &winit::window::Window,) -> DebugGui {
+    pub(crate) fn build(self, render_target: &RenderTarget, window: &winit::window::Window,) -> DebugGui<'a> {
         DebugGui::new(render_target, window, self.debug_windows, self.open)
     }
 }
@@ -118,7 +136,7 @@ impl SceneMapBuilder {
         self
     }
     /// Consumes another builder and combines its data.
-    pub fn with_builder(mut self, other: Self) -> Self {
+    pub fn combine(mut self, other: Self) -> Self {
         self.map.extend(other.map);
         self
     }
@@ -170,4 +188,9 @@ impl<'a> AssetTypeMapBuilder<'a> {
             }
         }
     }
+}
+
+/// Implement this trait to add assets at build time.
+pub trait AssetBuilder {
+    fn build(self: Box<Self>, render_target: &RenderTarget, assets: &mut AssetTypeMap);
 }

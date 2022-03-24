@@ -39,7 +39,7 @@ where RawAssetType: RawAsset<AssetType>, AssetType: Any {
 
 /// Generically implements [RawAssetMapper::to_asset_map]
 pub fn generic_to_asset_map<'a, 'f, RawAssetType, AssetType>
-(mapper: HashMap<String, RawAssetType>, builder: &AssetBuilder<'f>, ) -> AssetMap
+(mapper: HashMap<String, RawAssetType>, builder: &AssetBuildTarget<'f>, ) -> AssetMap
 where RawAssetType: RawAsset<AssetType>, AssetType: Any {
     AssetMap::from_map(
         HashMap::<String, AssetType>::from_iter(

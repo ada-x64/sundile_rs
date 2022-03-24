@@ -3,7 +3,6 @@
 pub mod camera;
 pub mod texture;
 pub mod model;
-pub mod instance;
 pub mod light;
 pub mod render_target;
 pub mod text;
@@ -15,7 +14,6 @@ pub mod prelude {
         camera::*,
         texture::*,
         model::*,
-        instance::*,
         light::*,
         render_target::*,
         text::*,

@@ -1,11 +1,12 @@
 use crate::prelude::*;
 use anyhow::*;
-use std::ops::Range;
-use std::path::Path;
+// use std::ops::Range;
+use std::{path::Path, rc::Rc};
 use tobj::LoadOptions;
 use wgpu::util::DeviceExt;
 use cgmath::InnerSpace;
 use serde::*;
+use cgmath::*;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
@@ -54,14 +55,15 @@ impl Vertex for ModelVertex {
     }
 }
 
+/// A Material is a collection of textures used on a model.
 pub struct Material {
-    pub name: String,
-    pub diffuse_texture: texture::Texture, //TODO: Probably shouldn't own these.
-    pub normal_texture: texture::Texture,
+    pub diffuse_texture: Rc<Texture>,
+    pub normal_texture: Rc<Texture>,
     pub bind_group: wgpu::BindGroup,
 }
 impl Material {
-    pub fn new(name: String, diffuse_texture: texture::Texture, normal_texture: texture::Texture, device: &wgpu::Device) -> Self {
+    /// Creates a new [Material].
+    pub fn new(label: Option<&str>, diffuse_texture: Rc<Texture>, normal_texture: Rc<Texture>, device: &wgpu::Device) -> Self {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &Texture::get_bind_group_layout(device),
             entries: &[
@@ -82,10 +84,9 @@ impl Material {
                     resource: wgpu::BindingResource::Sampler(&normal_texture.sampler),
                 },
             ],
-            label: None,
+            label,
         });
         Self {
-            name,
             diffuse_texture,
             normal_texture,
             bind_group,
@@ -94,10 +95,44 @@ impl Material {
 }
 impl core::fmt::Debug for Material {
     fn fmt(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
-        formatter.debug_list().entry(&self.name).finish()
+        formatter.debug_list().entry(&self.bind_group).finish()
     }
 }
 
+/// A terrible little builder struct so we can have a portable intermediary format.
+/// Note that this is only useful if you cannot directly pass the [Texture]s into [Material]::new().
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MaterialBuilder {
+    diffuse_texture: Vec<u8>,
+    normal_texture: Vec<u8>,
+    label: Option<String>,
+}
+impl MaterialBuilder {
+    /// Creates a new MaterialBuilder. Note that this takes textures as bytes.
+    pub fn new(label: Option<String>, diffuse_texture: Vec<u8>, normal_texture: Vec<u8>) -> Self {
+        Self {
+            diffuse_texture,
+            normal_texture,
+            label,
+        }
+    }
+    /// Builds the material. This will fail if the textures cannot be created from the passed-in bits.
+    /// You might want to pass the newly-created Rc<Texture>'s to an AssetTypeMap.
+    pub fn build(self, device: &wgpu::Device, queue: &wgpu::Queue) -> Material {
+        let name = self.label.unwrap_or("unnamed mesh".to_string());
+        let diffuse_texture = Rc::new(
+            Texture::from_bytes(device, queue, &self.diffuse_texture[..], &*format!("{} Diffuse", &name), false)
+            .unwrap()
+        );
+        let normal_texture = Rc::new(
+            Texture::from_bytes(device, queue, &self.normal_texture[..], &*format!("{} Normal", &name), true)
+            .unwrap()
+        );
+        Material::new(Some(&*name), diffuse_texture, normal_texture, device)
+    }
+}
+
+/// A mesh describes part of the geometry of a model.
 #[derive(Debug)]
 pub struct Mesh {
     pub name: String,
@@ -107,31 +142,113 @@ pub struct Mesh {
     pub material: usize,
 }
 
+/// A struct for creating meshes. Generally follows the builder pattern, but [generate] does not consume self.
+/// This allows you to keep the vertices and indices for later use or modification.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MeshBuilder {
-    vertices: Vec<ModelVertex>,
-    indices: Vec<u32>,
+    pub vertices: Vec<ModelVertex>,
+    pub indices: Vec<u32>,
     name: Option<String>,
     material_id: Option<usize>,
+    calculate_tangents: bool,
 }
 impl MeshBuilder {
+    /// Creates a new MeshBuilder.
     pub fn new(vertices: Vec<ModelVertex>, indices: Vec<u32>, ) -> Self {
         Self {
             vertices,
             indices,
             name: None,
             material_id: None,
+            calculate_tangents: false,
         }
     }
+    /// Allows you to replace the currently existing vertex array while conforming to builder pattern.
+    pub fn with_vertices(mut self, vertices: Vec<ModelVertex>) -> Self {
+        self.vertices = vertices;
+        self
+    }
+    /// Allows you to replace the currently exiting index array while conforming to builder pattern.
+    pub fn with_indices(mut self, indices: Vec<u32>) -> Self {
+        self.indices = indices;
+        self
+    }
+    /// Adds a name to the mesh, used for debugging. Defaults to "unnamed mesh".
     pub fn with_name(mut self, name: String) -> Self {
         self.name = Some(name);
         self
     }
+    /// Adds a material_id to the mesh. This needs to be correlated to your model's materials. This defaults to 0.
     pub fn with_material_id(mut self, material_id: usize) -> Self {
         self.material_id = Some(material_id);
         self
     }
-    pub fn with_tangents(mut self) -> Self { 
-        let (vertices, indices) = (&mut self.vertices, &mut self.indices);
+    /// Calculates tangents and bitangents for the mesh. 
+    pub fn with_tangents(mut self, calculate_tangents: bool) -> Self {
+        self.calculate_tangents = calculate_tangents; 
+        self
+    }
+    /// Generates a [Mesh]. Does *not* consume self.
+    pub fn generate(&mut self, device: &wgpu::Device) -> Mesh {
+        if self.calculate_tangents {
+            self.calculate_tangents();
+        }
+        let name = self.name.clone().unwrap_or("unnamed mesh".to_string());
+
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Vertex Buffer", name)),
+                contents: bytemuck::cast_slice(&self.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+        let index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Index Buffer", name)),
+                contents: bytemuck::cast_slice(&self.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
+        Mesh {
+            name,
+            vertex_buffer,
+            index_buffer,
+            num_elements: self.indices.len() as u32,
+            material: self.material_id.unwrap_or(0),
+        }
+    }
+    /// Builds a [Mesh], consuming self.
+    pub fn build(mut self, device: &wgpu::Device) -> Mesh {
+        if self.calculate_tangents { self.calculate_tangents(); }
+        let name = self.name.unwrap_or("unnamed mesh".to_string());
+
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Vertex Buffer", name)),
+                contents: bytemuck::cast_slice(&self.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+        let index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Index Buffer", name)),
+                contents: bytemuck::cast_slice(&self.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
+        Mesh {
+            name,
+            vertex_buffer,
+            index_buffer,
+            num_elements: self.indices.len() as u32,
+            material: self.material_id.unwrap_or(0),
+        }
+    }
+
+    fn calculate_tangents(&mut self) {
+        let (vertices, indices) = (&mut self.vertices, &self.indices);
         let mut triangles_included = (0..vertices.len()).collect::<Vec<_>>();
 
         for c in indices.chunks(3) {
@@ -188,53 +305,164 @@ impl MeshBuilder {
                 .normalize()
                 .into();
         }
-
-        self
     }
-    pub fn build(self, device: &wgpu::Device) -> Mesh {
-        let name = self.name.unwrap_or("unnamed mesh".to_string());
+}
 
-        let vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Vertex Buffer", name)),
-                contents: bytemuck::cast_slice(&self.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
-        let index_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Index Buffer", name)),
-                contents: bytemuck::cast_slice(&self.indices),
-                usage: wgpu::BufferUsages::INDEX,
-            }
-        );
-
-        Mesh {
-            name,
-            vertex_buffer,
-            index_buffer,
-            num_elements: self.indices.len() as u32,
-            material: self.material_id.unwrap_or(0),
+/// The Instance struct defines the position and rotation of a model instance.
+#[derive(Debug)]
+pub struct Instance {
+	pub position: Vector3<f32>,
+	pub rotation: Quaternion<f32>,
+}
+impl Instance {
+    /// Creates a new instance at the given position and rotation.
+    pub fn new(position: Vector3<f32>, rotation: Quaternion<f32>) -> Self {
+        Self {
+            position,
+            rotation,
         }
     }
+    /// Creates an instance at the origin with no rotation.
+    pub fn at_origin() -> Self {
+        Self {
+            position: Vector3::zero(),
+            rotation: Quaternion::zero(),
+        }
+    }
+    /// Converts this easy-to-manipulate struct to the POD version used in shaders, [InstanceRaw].
+	pub fn as_raw(&self) -> InstanceRaw {
+		InstanceRaw {
+			model: (Matrix4::from_translation(self.position) * Matrix4::from(self.rotation)).into(),
+			normal: Matrix3::from(self.rotation).into(),
+		}
+	}
+	// pub fn from_transform(t: sundile_scripting::components::Transform) -> Self {
+	// 	Self {
+	// 		position: Vector3::new(t.x, t.y, t.z),
+	// 		rotation: Quaternion::from(Euler::new(Deg(t.yaw), Deg(t.pitch), Deg(t.roll)))
+	// 	}
+	// }
 }
 
-//TODO: Decouple this so meshes can be rendered with arbitrary materials (?)
+/// The InstanceRaw struct is a POD description of an instance.
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct InstanceRaw {
+	pub model: [[f32; 4]; 4],
+	pub normal: [[f32; 3]; 3],
+}
+impl Vertex for InstanceRaw {
+	fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+		use std::mem;
+		wgpu::VertexBufferLayout {
+			array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+			step_mode: wgpu::VertexStepMode::Instance,
+			attributes: &[
+				// 4 vec4s = mat4x4
+				wgpu::VertexAttribute {
+					offset: 0,
+					shader_location: 5,
+					format: wgpu::VertexFormat::Float32x4,
+				},
+				wgpu::VertexAttribute {
+					offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+					shader_location: 6,
+					format: wgpu::VertexFormat::Float32x4,
+				},
+				wgpu::VertexAttribute {
+					offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+					shader_location: 7,
+					format: wgpu::VertexFormat::Float32x4,
+				},
+				wgpu::VertexAttribute {
+					offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
+					shader_location: 8,
+					format: wgpu::VertexFormat::Float32x4,
+				},
+
+				wgpu::VertexAttribute {
+					offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
+					shader_location: 9,
+					format: wgpu::VertexFormat::Float32x3,
+				},
+				wgpu::VertexAttribute {
+					offset: mem::size_of::<[f32; 19]>() as wgpu::BufferAddress,
+					shader_location: 10,
+					format: wgpu::VertexFormat::Float32x3,
+				},
+				wgpu::VertexAttribute {
+					offset: mem::size_of::<[f32; 22]>() as wgpu::BufferAddress,
+					shader_location: 11,
+					format: wgpu::VertexFormat::Float32x3,
+				},
+			],
+		}
+	}
+}
+
+/// An InstanceCache holds all the instancing information for a particular model.
+#[derive(Debug)]
+pub struct InstanceCache {
+    instances: Vec<Instance>,
+    buffer: Option<wgpu::Buffer>,
+    dirty: bool,
+    // ranges: Vec<Range>,
+}
+impl InstanceCache {
+    /// Create a new InstanceCache.
+    pub fn new() -> Self {
+        Self {
+            instances: vec![],
+            buffer: None,
+            dirty: true,
+            // ranges: vec![],
+        }
+    }
+    /// Insert a new [Instance] to the cache.
+    pub fn insert(&mut self, instance: Instance) {
+        self.dirty = true;
+        self.instances.push(instance);
+    }
+    /// Remove all [Instance]s from the cache.
+    pub fn clear(&mut self) {
+        self.dirty = true;
+        self.instances.clear();
+    }
+    /// Updates the cache's internal buffer if necessary.
+    pub fn update(&mut self, device: &wgpu::Device) {
+        if self.dirty {
+            self.buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&self.instances.iter().map(Instance::as_raw).collect::<Vec<_>>()),
+                usage: wgpu::BufferUsages::VERTEX,
+            }));
+        }
+        self.dirty = false;
+    }
+    /// Sets the ranges of instances to be displayed. This is used so as not to render any instances that are off-screen.
+    pub fn set_ranges(&mut self) {
+        // This should allow you to set which instances to render.
+        // Possibly add helpers for all, none
+        todo!() 
+    }
+}
+
+/// A Model is a collection of [Mesh]s and [Material]s. It is displayed in the world using [Instance]s.
+/// TODO: Make the correlation between meshes and materials embedded in the code instead of relying on indexing.
+/// In particular, there is a one-to-many relationship from materials to meshes. Could be:
+/// HashMap<Rc<Material>, Vec<Rc<Mesh>>>
 #[derive(Debug)]
 pub struct Model {
-    pub meshes: Vec<Mesh>,
-    pub materials: Vec<Material>,
+    pub meshes: Vec<Rc<Mesh>>,
+    pub materials: Vec<Rc<Material>>,
+    pub instance_cache: InstanceCache,
 }
-
 impl Model {
-    pub fn load<P: AsRef<Path>>(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        path: P
-    ) -> Result<Self> {
+    /// This function loads in a model from an OBJ file.
+    pub fn load<P: AsRef<Path>>(device: &wgpu::Device, queue: &wgpu::Queue, path: P) -> Result<Self> {
         let (obj_models, obj_materials) = tobj::load_obj(
             path.as_ref(),
-&LoadOptions {
+            &LoadOptions {
                 triangulate: true,
                 single_index: true,
                 ..Default::default()
@@ -248,12 +476,16 @@ impl Model {
         let mut materials = Vec::new();
         for mat in obj_materials {
             let diffuse_path = mat.diffuse_texture;
-            let diffuse_texture = texture::Texture::load(device, queue, containing_folder.join(diffuse_path), false)?;
+            let diffuse_texture = Rc::new(
+                Texture::load(device, queue, containing_folder.join(diffuse_path), false)?
+            );
 
             let normal_path = mat.normal_texture;
-            let normal_texture = texture::Texture::load(device, queue, containing_folder.join(normal_path), true)?;
+            let normal_texture = Rc::new(
+                Texture::load(device, queue, containing_folder.join(normal_path), true)?
+            );
 
-            materials.push(Material::new(mat.name, diffuse_texture, normal_texture, &device));
+            materials.push(Rc::new(Material::new(Some(mat.name.as_str()), diffuse_texture, normal_texture, &device)));
         }
 
         let mut meshes = Vec::new();
@@ -280,177 +512,28 @@ impl Model {
                 });
             }
 
-            meshes.push(MeshBuilder::new(vertices, m.mesh.indices.clone(),)
-                .with_name(path.as_ref().display().to_string())
-                .with_material_id(m.mesh.material_id.unwrap_or(0))
-                .with_tangents()
-                .build(device)
-            );
-
-            {
-            // let mut triangles_included = (0..vertices.len()).collect::<Vec<_>>();
-
-            // //Calculate (bi)tangents
-            // for c in indices.chunks(3) {
-            //     let v0 = vertices[c[0] as usize];
-            //     let v1 = vertices[c[1] as usize];
-            //     let v2 = vertices[c[2] as usize];
-
-            //     let pos0 : cgmath::Vector3<_> = v0.position.into();
-            //     let pos1 : cgmath::Vector3<_> = v1.position.into();
-            //     let pos2 : cgmath::Vector3<_> = v2.position.into();
-
-            //     let uv0: cgmath::Vector2<_> = v0.tex_coords.into();
-            //     let uv1: cgmath::Vector2<_> = v1.tex_coords.into();
-            //     let uv2: cgmath::Vector2<_> = v2.tex_coords.into();
-
-            //     let delta_pos1 = pos1 - pos0;
-            //     let delta_pos2 = pos2 - pos0;
-
-            //     let delta_uv1 = uv1 - uv0;
-            //     let delta_uv2 = uv2 - uv0;
-
-            //     // Solving the following system of equations will
-            //     // give us the tangent and bitangent.
-            //     //     delta_pos1 = delta_uv1.x * T + delta_u.y * B
-            //     //     delta_pos2 = delta_uv2.x * T + delta_uv2.y * B
-            //     // Luckily, the place I found this equation provided
-            //     // the solution!
-
-            //     let r = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x);
-            //     let tangent = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-            //     let bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * r;
-
-            //     vertices[c[0] as usize].tangent = (tangent + cgmath::Vector3::from(vertices[c[0] as usize].tangent)).into();
-            //     vertices[c[1] as usize].tangent = (tangent + cgmath::Vector3::from(vertices[c[1] as usize].tangent)).into();
-            //     vertices[c[2] as usize].tangent = (tangent + cgmath::Vector3::from(vertices[c[2] as usize].tangent)).into();
-
-            //     vertices[c[0] as usize].bitangent = (bitangent + cgmath::Vector3::from(vertices[c[0] as usize].bitangent)).into();
-            //     vertices[c[1] as usize].bitangent = (bitangent + cgmath::Vector3::from(vertices[c[1] as usize].bitangent)).into();
-            //     vertices[c[2] as usize].bitangent = (bitangent + cgmath::Vector3::from(vertices[c[2] as usize].bitangent)).into();
-                
-            //     // Used to average the tangents/bitangents
-            //     triangles_included[c[0] as usize] += 1;
-            //     triangles_included[c[1] as usize] += 1;
-            //     triangles_included[c[2] as usize] += 1;
-            // }
-
-            // for (i, n) in triangles_included.into_iter().enumerate() {
-            //     let denom = 1.0 / n as f32;
-            //     let mut v = &mut vertices[i];
-            //     v.tangent = (cgmath::Vector3::from(v.tangent) * denom)
-            //         .normalize()
-            //         .into();
-            //     v.bitangent = (cgmath::Vector3::from(v.bitangent) * denom)
-            //         .normalize()
-            //         .into();
-            // }
-            
-            // let vertex_buffer = device.create_buffer_init(
-            //     &wgpu::util::BufferInitDescriptor {
-            //         label: Some(&format!("{:?} Vertex Buffer", path.as_ref())),
-            //         contents: bytemuck::cast_slice(&vertices),
-            //         usage: wgpu::BufferUsages::VERTEX,
-            //     }
-            // );
-            // let index_buffer = device.create_buffer_init(
-            //     &wgpu::util::BufferInitDescriptor {
-            //         label: Some(&format!("{:?} Index Buffer", path.as_ref())),
-            //         contents: bytemuck::cast_slice(&m.mesh.indices),
-            //         usage: wgpu::BufferUsages::INDEX,
-            //     }
-            // );
-
-            // meshes.push(Mesh {
-            //     name: m.name,
-            //     vertex_buffer,
-            //     index_buffer,
-            //     num_elements: m.mesh.indices.len() as u32,
-            //     material: m.mesh.material_id.unwrap_or(0),
-            // });
-            }
+            meshes.push(Rc::new(
+                MeshBuilder::new(vertices, m.mesh.indices.clone(),)
+                    .with_name(path.as_ref().display().to_string())
+                    .with_material_id(m.mesh.material_id.unwrap_or(0))
+                    .with_tangents(true)
+                    .generate(device)
+            ));
         }
 
-        Ok(Self {meshes, materials})
-    }
-}
-
-pub trait DrawModel<'a> {
-    fn draw_mesh(
-        &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    );
-    fn draw_mesh_instanced(
-        &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
-        instances: Range<u32>,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    );
-    fn draw_model(
-        &mut self,
-        model: &'a Model,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    );
-    fn draw_model_instanced(
-        &mut self,
-        model: &'a Model,
-        instances: Range<u32>,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    );
-}
-
-impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> where 'b: 'a, {
-    fn draw_mesh(
-        &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.draw_mesh_instanced(mesh, material, 0..1, camera_bind_group, light_bind_group);
+        Ok(Self {meshes, materials, instance_cache: InstanceCache::new()})
     }
 
-    fn draw_mesh_instanced(
-        &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
-        instances: Range<u32>,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        self.set_bind_group(0, &material.bind_group, &[]);
-        self.set_bind_group(1, camera_bind_group, &[]);
-        self.set_bind_group(2, light_bind_group, &[]);
-        self.draw_indexed(0..mesh.num_elements, 0, instances);
-    }
-    
-    fn draw_model(
-        &mut self,
-        model: &'a Model,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.draw_model_instanced(model, 0..1, camera_bind_group, light_bind_group,);
-    }
-    fn draw_model_instanced(
-        &mut self,
-        model: &'a Model,
-        instances: Range<u32>,
-        camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
-    ) {
-        for mesh in &model.meshes {
-            let material = &model.materials[mesh.material];
-            self.draw_mesh_instanced(mesh, material, instances.clone(), camera_bind_group, light_bind_group,);
+    /// This function renders all of the model's instances to the screen.
+    pub fn render<'r>(&'r self, render_pass: &mut wgpu::RenderPass<'r>, camera_bind_group: &'r wgpu::BindGroup, light_bind_group: &'r wgpu::BindGroup,) {
+        render_pass.set_vertex_buffer(1, self.instance_cache.buffer.as_ref().unwrap().slice(..));
+        for mesh in &self.meshes {
+            render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.set_bind_group(0, &self.materials[mesh.material].bind_group, &[]);
+            render_pass.set_bind_group(1, camera_bind_group, &[]);
+            render_pass.set_bind_group(2, light_bind_group, &[]);
+            render_pass.draw_indexed(0..mesh.num_elements, 0, 0..self.instance_cache.instances.len() as u32); //TODO: Add actual ranges.
         }
     }
 }

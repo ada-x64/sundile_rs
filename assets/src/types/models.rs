@@ -1,35 +1,18 @@
-use cgmath::InnerSpace;
-use wgpu::util::DeviceExt;
 use std::path::*;
 use std::fs::*;
 use std::io::Read;
+use std::rc::Rc;
 use serde::*;
 
 use crate::prelude::*;
 use sundile_graphics::prelude::*;
 
 #[derive(Serialize, Deserialize)]
-pub struct MaterialData {
-    pub name: String,
-    pub diffuse_texture: Vec<u8>,
-    pub normal_texture: Vec<u8>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MeshData {
-    pub name: String,
-    pub vertices: Vec<ModelVertex>,
-    pub indices: Vec<u32>,
-    pub material: usize,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct ModelData {
-    pub materials: Vec<MaterialData>,
-    pub meshes: Vec<MeshData>,
+    pub material_builders: Vec<MaterialBuilder>,
+    pub mesh_builders: Vec<MeshBuilder>,
 }
 
-//TODO: Clean this up using new Model fns
 impl RawAsset<Model> for ModelData {
     fn from_disk(path: &PathBuf) -> Self {
         let (obj_models, obj_materials) = tobj::load_obj(
@@ -44,7 +27,7 @@ impl RawAsset<Model> for ModelData {
         let obj_materials = obj_materials.expect("Failed to unwrap materials");
 
         let dir = path.parent().unwrap();
-        let mut materials = Vec::new();
+        let mut material_builders = Vec::new();
         for mat in obj_materials {
             //TODO: Probably compress these.
             let mut diffuse_texture = Vec::<u8>::new();
@@ -55,14 +38,10 @@ impl RawAsset<Model> for ModelData {
             let mut file = File::open(dir.join(mat.normal_texture)).unwrap();
             file.read_to_end(&mut normal_texture).unwrap();
 
-            materials.push(MaterialData {
-                name: mat.name,
-                diffuse_texture,
-                normal_texture,
-            });
+            material_builders.push(MaterialBuilder::new(Some(mat.name), diffuse_texture, normal_texture));
         }
 
-        let mut meshes = Vec::new();
+        let mut mesh_builders = Vec::new();
         for m in obj_models {
             let mut vertices = Vec::new();
             for i in 0..m.mesh.positions.len() / 3 {
@@ -86,143 +65,34 @@ impl RawAsset<Model> for ModelData {
                 });
             }
 
-            let indices = &m.mesh.indices;
-            let mut triangles_included = (0..vertices.len()).collect::<Vec<_>>();
-
-            //Calculate (bi)tangents
-            for c in indices.chunks(3) {
-                let v0 = vertices[c[0] as usize];
-                let v1 = vertices[c[1] as usize];
-                let v2 = vertices[c[2] as usize];
-
-                let pos0 : cgmath::Vector3<_> = v0.position.into();
-                let pos1 : cgmath::Vector3<_> = v1.position.into();
-                let pos2 : cgmath::Vector3<_> = v2.position.into();
-
-                let uv0: cgmath::Vector2<_> = v0.tex_coords.into();
-                let uv1: cgmath::Vector2<_> = v1.tex_coords.into();
-                let uv2: cgmath::Vector2<_> = v2.tex_coords.into();
-
-                let delta_pos1 = pos1 - pos0;
-                let delta_pos2 = pos2 - pos0;
-
-                let delta_uv1 = uv1 - uv0;
-                let delta_uv2 = uv2 - uv0;
-
-                // Solving the following system of equations will
-                // give us the tangent and bitangent.
-                //     delta_pos1 = delta_uv1.x * T + delta_u.y * B
-                //     delta_pos2 = delta_uv2.x * T + delta_uv2.y * B
-                // Luckily, the place I found this equation provided
-                // the solution!
-
-                let r = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x);
-                let tangent = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-                let bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * r;
-
-                vertices[c[0] as usize].tangent = (tangent + cgmath::Vector3::from(vertices[c[0] as usize].tangent)).into();
-                vertices[c[1] as usize].tangent = (tangent + cgmath::Vector3::from(vertices[c[1] as usize].tangent)).into();
-                vertices[c[2] as usize].tangent = (tangent + cgmath::Vector3::from(vertices[c[2] as usize].tangent)).into();
-
-                vertices[c[0] as usize].bitangent = (bitangent + cgmath::Vector3::from(vertices[c[0] as usize].bitangent)).into();
-                vertices[c[1] as usize].bitangent = (bitangent + cgmath::Vector3::from(vertices[c[1] as usize].bitangent)).into();
-                vertices[c[2] as usize].bitangent = (bitangent + cgmath::Vector3::from(vertices[c[2] as usize].bitangent)).into();
-                
-                // Used to average the tangents/bitangents
-                triangles_included[c[0] as usize] += 1;
-                triangles_included[c[1] as usize] += 1;
-                triangles_included[c[2] as usize] += 1;
-            }
-
-            for (i, n) in triangles_included.into_iter().enumerate() {
-                let denom = 1.0 / n as f32;
-                let mut v = &mut vertices[i];
-                v.tangent = (cgmath::Vector3::from(v.tangent) * denom)
-                    .normalize()
-                    .into();
-                v.bitangent = (cgmath::Vector3::from(v.bitangent) * denom)
-                    .normalize()
-                    .into();
-            }
-
-            meshes.push(MeshData {
-                name: m.name,
-                vertices,
-                indices: m.mesh.indices,
-                material: m.mesh.material_id.unwrap_or(0),
-            });
+            mesh_builders.push(
+                MeshBuilder::new(vertices, m.mesh.indices)
+                .with_material_id(m.mesh.material_id.unwrap_or(0))
+                .with_name(m.name)
+                .with_tangents(true)
+            );
         }
 
-        Self {meshes, materials}
+        Self {mesh_builders, material_builders}
     }
 
-    fn to_asset(self, builder: &AssetBuilder) -> Model {
+    fn to_asset(self, builder: &AssetBuildTarget) -> Model {
         let (device, queue) = (builder.device, builder.queue);
 
         let mut materials = vec![];
-        for data in self.materials {
-            let diffuse_texture = Texture::from_bytes(device, queue, &data.diffuse_texture[..], format!("{} diffuse texture", data.name).as_str(), false).unwrap();
-            let normal_texture = Texture::from_bytes(device, queue, &data.normal_texture[..], format!("{} normal texture", data.name).as_str(), true).unwrap();
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &Texture::get_bind_group_layout(device),
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&normal_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::Sampler(&normal_texture.sampler),
-                    },
-                ],
-                label: None,
-            });
-
-            materials.push(Material {
-                name: data.name,
-                diffuse_texture,
-                normal_texture,
-                bind_group,
-            });
+        for builder in self.material_builders {
+            materials.push(Rc::new(builder.build(device, queue)));
         }
 
         let mut meshes = vec![];
-        for data in self.meshes {
-            let vertex_buffer = device.create_buffer_init(
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("{:?} Vertex Buffer", data.name)),
-                    contents: bytemuck::cast_slice(&data.vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                }
-            );
-            let index_buffer = device.create_buffer_init(
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("{:?} Index Buffer", data.name)),
-                    contents: bytemuck::cast_slice(&data.indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                }
-            );
-
-            meshes.push(Mesh {
-                name: data.name,
-                vertex_buffer,
-                index_buffer,
-                num_elements: data.indices.len() as u32,
-                material: data.material,
-            });
+        for mut builder in self.mesh_builders {
+            meshes.push(Rc::new(builder.generate(&device)));
         }
 
         Model{
             meshes,
             materials,
+            instance_cache: InstanceCache::new(),
         }
     }
 }
@@ -233,7 +103,7 @@ impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "models", "obj",);
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
         crate::util::generic_to_asset_map(*self, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {

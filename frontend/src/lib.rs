@@ -4,7 +4,7 @@ pub mod builders;
 use debug_gui::*;
 
 // internal crates
-use sundile_core::prelude::*;
+pub use sundile_core::prelude::*;
 use sundile_graphics::prelude::*;
 use sundile_assets::prelude::*;
 use sundile_scripting::prelude::*;
@@ -13,15 +13,26 @@ use sundile_scripting::prelude::*;
 use winit::{event::*, event_loop::*, window::*};
 use std::time::*;
 
-pub struct Engine {
+// exports
+pub mod prelude {
+    pub mod core { pub use sundile_core::*; }
+    pub mod graphics { pub use sundile_graphics::*; }
+    pub mod assets { pub use sundile_assets::*; }
+    pub mod scripting { pub use sundile_scripting::*; }
+    pub use crate::builders;
+    pub use crate::debug_gui;
+}
+pub use prelude::*;
+
+pub struct Engine<'a> {
     event_loop: EventLoop<()>,
     window: Window,
     render_target: RenderTarget,
     assets: AssetTypeMap,
     scene_map: SceneMap,
-    debug_gui: DebugGui,
+    debug_gui: DebugGui<'a>,
 }
-impl Engine {
+impl Engine<'static> {
     /// Runs the game.
     /// Note that this hands control of the main thread to winit. Be sure this is the last thing you call!
     pub fn run(self) -> () {
@@ -31,7 +42,8 @@ impl Engine {
             mut render_target,
             assets,
             scene_map,
-            mut debug_gui) = (
+            mut debug_gui
+        ) = (
             self.event_loop,
             self.window,
             self.render_target,
@@ -40,7 +52,7 @@ impl Engine {
             self.debug_gui
         );
 
-        let mut game = game::Game::new(&render_target, assets, scene_map, None, !debug_gui.open);
+        let mut game = Game::new(&render_target, assets, scene_map, None, !debug_gui.open);
         let mut fps = 0.0;
         let mut prev_time = Instant::now();
      
@@ -62,7 +74,7 @@ impl Engine {
                     
                     render_target.begin_frame();
                     game.render(&mut render_target);
-                    debug_gui.render(&mut render_target, &window, &game);
+                    debug_gui.render(&mut render_target, &window, &mut game);
                     render_target.end_frame();
                 },
                 winit::event::Event::WindowEvent {window_id, event}

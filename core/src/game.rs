@@ -51,7 +51,7 @@ impl<'a> Game<'a> {
 
     pub fn render(&mut self, render_target: &mut RenderTarget) {
         if self.paused {return;}
-        self.renderer.render(render_target, &self.world, &self.assets);
+        self.renderer.render(render_target, &self.world, &mut self.assets);
         self.renderer2d.render(render_target);
     }
 

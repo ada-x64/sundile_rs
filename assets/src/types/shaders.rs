@@ -37,7 +37,7 @@ impl RawAsset<ShaderModule> for ShaderData {
     }
 
     /// Converts the SPIR-V binary to a shader module.
-    fn to_asset(self, asset_builder: &AssetBuilder) -> ShaderModule {
+    fn to_asset(self, asset_builder: &AssetBuildTarget) -> ShaderModule {
         unsafe {
             asset_builder.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
                 label: None,
@@ -53,7 +53,7 @@ impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "shaders", "wgsl");
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
         crate::util::generic_to_asset_map(*self, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {

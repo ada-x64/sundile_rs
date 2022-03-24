@@ -45,6 +45,12 @@ impl AssetStorage {
             value: Rc::new(value),
         }
     }
+    /// Constructs a new asset from a heap-allocated value.
+    pub fn from_ref<T>(value: Rc<T>) -> Self where T:'static {
+        Self {
+            value
+        }
+    }
     /// Tries to return a reference counted pointer to the underlying asset.
     /// This function fails if the asset is not of type T.
     pub fn try_get<T>(&self) -> Result<Rc<T>> where T: 'static {
@@ -125,6 +131,21 @@ impl AssetMap {
     pub fn try_insert<S, T>(&mut self, name: S, asset: T) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where S: Into<String>, T: 'static {
         if TypeId::of::<T>() == self.type_id {
             match self.map.insert(name.into(), AssetStorage::new(asset)) {
+                Some(asset_storage) => {
+                    match asset_storage.try_take() {
+                        Ok(val) => return Ok(Some(val)),
+                        Err((err, storage)) => return Err((err, Some(storage))),
+                    }
+                },
+                None => return Ok(None),
+            }
+        }
+        return Err((AssetError::InvalidType, None));
+    }
+    /// Like [try_insert], but assumes the value is already on the heap.
+    pub fn try_insert_ref<S, T>(&mut self, name: S, asset: Rc<T>) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where S: Into<String>, T: 'static {
+        if TypeId::of::<T>() == self.type_id {
+            match self.map.insert(name.into(), AssetStorage::from_ref(asset)) {
                 Some(asset_storage) => {
                     match asset_storage.try_take() {
                         Ok(val) => return Ok(Some(val)),
@@ -219,7 +240,7 @@ impl AssetMap {
 
 /// Typemap for assets. Thin wrapper over HashMap<TypeId, [AssetMap]>.
 /// This should be your primary point of contact with all assets. Its API is a little bit cumbersome, but is safe.
-/// Note that for this to work you need to use structs to define your types. The below illustrates this.
+/// Because this system relies on TypeId, it is incompatible with type aliasing.
 /// ```rust
 /// type Data1 = Vec<u8>;
 /// type Data2 = Vec<u8>;
@@ -227,6 +248,15 @@ impl AssetMap {
 /// assert_eq!(TypeId::of::<Data1>(), TypeId::of::<Data2>());
 /// assert_neq!(TypeId::of::<Data1>(), TypeId::of::<Data3>());
 /// ```
+/// This system does not implement internal mutability. Instead, use the following pattern:
+/// ```rust
+/// fn f<T>(assets: &mut AssetTypeMap) where T: 'static {
+///     let mut taken = assets.try_take_asset::<T>("my_asset");
+///     // do things here
+///     assets.try_insert_asset(taken);
+/// }
+/// ```
+/// TODO: Is this pattern efficient? Perhaps do benchmarks to determine if the size/efficiency tradeoff is worthwhile.
 #[derive(Debug)]
 pub struct AssetTypeMap {
     // size_of::<TypeId> == 8 vs size_of::<String> == 24 vs size_of::<&str> == 16
@@ -268,6 +298,20 @@ impl AssetTypeMap {
         match self.map.get_mut(&ty) {
             Some(map) => {
                 map.try_insert(name, asset)
+            }
+            None => {
+                self.map.insert(ty, AssetMap::from_asset(name, asset));
+                Ok(None)
+            }
+        }
+    }
+
+    /// Same as [try_insert_asset], but assumes the value is already on the heap.
+    pub fn try_insert_asset_ref<'a, T>(&mut self, name: &'a str, asset: Rc<T>) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where T: 'static {
+        let ty = TypeId::of::<T>();
+        match self.map.get_mut(&ty) {
+            Some(map) => {
+                map.try_insert_ref(name, asset)
             }
             None => {
                 self.map.insert(ty, AssetMap::from_asset(name, asset));
@@ -376,7 +420,7 @@ pub trait RawAsset<AssetType> where AssetType : Any {
     /// Loads an individual asset from disk and stores it in this type.
     fn from_disk(path: &PathBuf) -> Self;
     /// Converts this type to the AssetType to be used with the engine.
-    fn to_asset<'f>(self, render_target: &AssetBuilder<'f>) -> AssetType;
+    fn to_asset<'f>(self, render_target: &AssetBuildTarget<'f>) -> AssetType;
 }
 
 /// Type that converts a specified RawAsset type to a specified Asset type.
@@ -385,7 +429,7 @@ pub trait RawAssetMapper {
     /// Tip: call RawAsset::load_from_disk internally.
     fn load(&mut self, asset_dir: &PathBuf);
     /// Converts from raw data to the representation used in-game.
-    fn to_asset_map<'a>(self: Box<Self>, asset_builder: &AssetBuilder) -> AssetMap;
+    fn to_asset_map<'a>(self: Box<Self>, asset_builder: &AssetBuildTarget) -> AssetMap;
     /// Deserializes from bytecode into raw asset data.
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap);
     /// Serializes self from raw asset data to bytecode
@@ -397,21 +441,21 @@ pub type RawAssetMap<'a, AssetType> = HashMap<String, Box<dyn RawAsset<AssetType
 
 /// Builds assets from a RenderTarget.
 /// Only intended to last for the duration of a deserialization call.
-pub struct AssetBuilder<'a> {
+pub struct AssetBuildTarget<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
 }
-impl<'a> From<&'a HeadlessRenderTarget> for AssetBuilder<'a> {
+impl<'a> From<&'a HeadlessRenderTarget> for AssetBuildTarget<'a> {
     fn from(other: &'a HeadlessRenderTarget) -> Self {
-        AssetBuilder {
+        AssetBuildTarget {
             device: &other.device,
             queue: &other.queue
         }
     }
 }
-impl<'a> From<&'a RenderTarget> for AssetBuilder<'a> {
+impl<'a> From<&'a RenderTarget> for AssetBuildTarget<'a> {
     fn from(other: &'a RenderTarget) -> Self {
-        AssetBuilder {
+        AssetBuildTarget {
             device: &other.device,
             queue: &other.queue
         }

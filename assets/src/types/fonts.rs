@@ -15,7 +15,7 @@ impl RawAsset<Font> for Font {
     }
 
     /// Simply returns the byte vector.
-    fn to_asset(self, _: &AssetBuilder) -> Font {
+    fn to_asset(self, _: &AssetBuildTarget) -> Font {
         self
     }
 }
@@ -35,7 +35,7 @@ impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load::<Font, Font>(&mut self.map, asset_dir, "fonts", "ttf");
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuilder) -> AssetMap {
+    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
         crate::util::generic_to_asset_map::<Font, Font>(self.map, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {
