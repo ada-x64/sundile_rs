@@ -12,10 +12,9 @@ legion = "*"
 futures = "*"
 
 # debug_gui
-egui = "0.16"
-egui_wgpu_backend = "0.16"
-egui_winit_platform = "0.13"
-epi = "0.16"
+egui = "*"
+egui_wgpu_backend = "*"
+egui_winit_platform = "*"
 
 # internal
 sundile_core = { path = "../core" }
