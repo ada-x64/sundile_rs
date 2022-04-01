@@ -2,7 +2,7 @@ use std::time::*;
 use legion::*;
 
 use sundile_graphics::prelude::*;
-use sundile_assets::prelude::*;
+use sundile_assets::*;
 use sundile_scripting::prelude::*;
 
 use crate::renderer::*;

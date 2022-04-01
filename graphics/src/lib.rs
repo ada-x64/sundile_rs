@@ -19,6 +19,8 @@ pub mod prelude {
         text::*,
         texture_atlas::*,
     };
+    pub mod futures {pub use futures::*;}
+    pub mod wgpu {pub use wgpu::*; pub use wgpu::util::*;}
 }
 pub use prelude::*;
 
@@ -29,6 +31,40 @@ pub trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Vert2d {
+    pub position: [f32;3],
+    pub color: [f32;4],
+    pub texcoords: [f32;2],
+}
+
+impl Vertex for Vert2d {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Vert2d>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 7]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                }
+            ],
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
@@ -89,6 +125,7 @@ impl Viewport {
  * Tests
  ************************************************/
 
+#[cfg(target_arch="windows")]
 #[test]
 fn test_empty_frame() {
     use winit::platform::windows::EventLoopExtWindows;

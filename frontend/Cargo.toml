@@ -5,19 +5,32 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 # general
-winit = "*"
-legion = "*"
-futures = "*"
+wasm-bindgen = "0.2.79"
+winit = "0.26.1"
+anyhow = "1.*"
 
 # debug_gui
-egui = "*"
-egui_wgpu_backend = "*"
-egui_winit_platform = "*"
+egui = "0.17.*"
+egui-winit = "0.17.*"
+egui_wgpu_backend = "0.17.*"
 
 # internal
 sundile_core = { path = "../core" }
 sundile_graphics = { path = "../graphics" }
 sundile_assets = { path = "../assets" }
 sundile_scripting = { path = "../scripting" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+console_log = "0.2.0"
+wasm-bindgen-futures = "0.4.29"
+web-sys = {version = "*", features = [
+    "Document",
+    "Window",
+    "HtmlCanvasElement",
+] }

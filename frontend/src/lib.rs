@@ -3,14 +3,8 @@ pub mod debug_gui;
 pub mod builders;
 use debug_gui::*;
 
-// internal crates
-pub use sundile_core::prelude::*;
-use sundile_graphics::prelude::*;
-use sundile_assets::prelude::*;
-use sundile_scripting::prelude::*;
-
 // external crates
-use winit::{event::*, event_loop::*, window::*};
+use winit::{event_loop::*, window::*};
 use std::time::*;
 
 // exports
@@ -19,10 +13,12 @@ pub mod prelude {
     pub mod graphics { pub use sundile_graphics::*; }
     pub mod assets { pub use sundile_assets::*; }
     pub mod scripting { pub use sundile_scripting::*; }
+    pub use self::core::*;
     pub use crate::builders;
     pub use crate::debug_gui;
 }
 pub use prelude::*;
+use prelude::{assets::*, builders::*};
 
 pub struct Engine<'a> {
     event_loop: EventLoop<()>,
@@ -33,9 +29,8 @@ pub struct Engine<'a> {
     debug_gui: DebugGui<'a>,
 }
 impl Engine<'static> {
-    /// Runs the game.
-    /// Note that this hands control of the main thread to winit. Be sure this is the last thing you call!
-    pub fn run(self) -> () {
+
+    fn run_internal(self) {
         let (
             event_loop,
             window,
@@ -57,13 +52,9 @@ impl Engine<'static> {
         let mut prev_time = Instant::now();
      
         event_loop.run(move |event, _, control_flow| {
-    
-            debug_gui.handle_event(&event);
             game.paused = !debug_gui.open;
-    
             match event {
                 winit::event::Event::MainEventsCleared => {
-                            
                     let time = Instant::now();
                     let dt = time - prev_time;
                     prev_time = time;
@@ -79,38 +70,44 @@ impl Engine<'static> {
                 },
                 winit::event::Event::WindowEvent {window_id, event}
                     if window_id == window.id() => {
-                    match event {
-                        WindowEvent::CloseRequested => {
-                            *control_flow = ControlFlow::Exit;
-                        },
-                        //TODO: Implement Input system.
-                        WindowEvent::KeyboardInput {input, ..} => {
-                            if input.state == ElementState::Released {
-                                match input.virtual_keycode {
-                                    Some(code) => {
-                                        match code {
-                                            VirtualKeyCode::F5 => {
-                                                debug_gui.open = !debug_gui.open;
-                                            }
-                                            VirtualKeyCode::Escape => {
-                                                *control_flow = ControlFlow::Exit;
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                    None => {}
-                                }
-                            }
-                        },
-                        _ => {
+                        
+                    match debug_gui.handle_event(event, control_flow) {
+                        Some(_event) => {
+                            //perhaps pass to game here?
                         }
+                        _ => {}
                     }
                 },
+                //TODO : ensure device event is for this window!
                 winit::event::Event::DeviceEvent {ref event, ..} => {
                     game.handle_input(&event);
                 },
                 _ => {}
             }
         });
+    }
+
+    /// Runs the game.
+    /// Note that this hands control of the main thread to winit. Be sure this is the last thing you call!
+    pub fn run(self) -> () {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.run_internal();
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+            console_log::init().expect("could not initialize logger");
+            // Append the canvas to the document body.
+            use winit::platform::web::WindowExtWebSys;
+    
+            let web_window = web_sys::window().unwrap();
+            let doc = web_window.document().unwrap();
+            let body = doc.body().unwrap();
+            body.append_child(&self.window.canvas()).unwrap();
+    
+            self.run_internal();
+        }
+
     }
 }

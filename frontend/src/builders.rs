@@ -1,6 +1,6 @@
 pub use sundile_scripting::prelude::*;
 pub use sundile_graphics::prelude::*;
-pub use sundile_assets::prelude::*;
+pub use sundile_assets::*;
 pub use crate::debug_gui::*;
 pub use crate::Engine;
 pub use winit::{window::WindowBuilder, event_loop::EventLoop};
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// Builder for the game engine. 
 pub struct EngineBuilder<'a> {
     window_builder: Option<WindowBuilder>,
-    render_target: Option<RenderTarget>,
+    render_target_builder: Option<RenderTargetBuilder<'a>>,
     asset_typemap_builder: Option<AssetTypeMapBuilder<'a>>,
     scene_map_builder: Option<SceneMapBuilder>,
     debug_gui_builder: Option<DebugGuiBuilder<'a>>,
@@ -20,7 +20,7 @@ impl<'a> EngineBuilder<'a> {
     pub fn new() -> Self {
         Self {
             window_builder: None,
-            render_target: None,
+            render_target_builder: None,
             asset_typemap_builder: None,
             scene_map_builder: None,
             debug_gui_builder: None,
@@ -33,8 +33,8 @@ impl<'a> EngineBuilder<'a> {
         self
     }
     /// Sets a custom render target.
-    pub fn with_render_target(mut self, render_target: RenderTarget) -> Self {
-        self.render_target = Some(render_target);
+    pub fn with_render_target(mut self, render_target_builder: RenderTargetBuilder<'a>) -> Self {
+        self.render_target_builder = Some(render_target_builder);
         self
     }
     /// Adds an [AssetTypeMapBuilder], which will load assets either statically or at runtime.
@@ -62,9 +62,7 @@ impl<'a> EngineBuilder<'a> {
 
         let event_loop = EventLoop::new();
         let window = self.window_builder.unwrap_or(WindowBuilder::new()).build(&event_loop).expect("Unable to build window!");
-        let render_target = self.render_target.unwrap_or(
-            futures::executor::block_on(RenderTarget::new(&window, false, Some("Default Render Target"))),
-        );
+        let render_target = self.render_target_builder.unwrap_or(RenderTargetBuilder::new(None, false)).build(&window);
         let mut assets = self.asset_typemap_builder.unwrap_or(AssetTypeMapBuilder::new()).build(&render_target);
         let debug_gui = self.debug_gui_builder.unwrap_or(DebugGuiBuilder::new()).build(&render_target, &window);
         let scene_map = self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).build();
@@ -193,4 +191,23 @@ impl<'a> AssetTypeMapBuilder<'a> {
 /// Implement this trait to add assets at build time.
 pub trait AssetBuilder {
     fn build(self: Box<Self>, render_target: &RenderTarget, assets: &mut AssetTypeMap);
+}
+
+/// Basic builder for [RenderTarget]s.
+pub struct RenderTargetBuilder<'a> {
+    label: Option<&'a str>,
+    enable_tracing: bool,
+}
+impl<'a> RenderTargetBuilder<'a> {
+    pub fn new(label: Option<&'a str>, enable_tracing: bool) -> Self {
+        Self {
+            label,
+            enable_tracing
+        }
+    }
+    pub(crate) fn build(self, window: &winit::window::Window) -> RenderTarget {
+        futures::executor::block_on(
+            RenderTarget::new(window, self.enable_tracing, self.label)
+        )
+    }
 }

@@ -8,6 +8,7 @@ use thiserror::Error;
 
 use sundile_graphics::prelude::HeadlessRenderTarget;
 use sundile_graphics::render_target::RenderTarget;
+use sundile_graphics::prelude::wgpu;
 
 // ---
 // The below types deal with Assets as they are presented to the game.
@@ -242,18 +243,20 @@ impl AssetMap {
 /// This should be your primary point of contact with all assets. Its API is a little bit cumbersome, but is safe.
 /// Because this system relies on TypeId, it is incompatible with type aliasing.
 /// ```rust
+/// use std::any::TypeId;
 /// type Data1 = Vec<u8>;
 /// type Data2 = Vec<u8>;
 /// struct Data3 { data: Vec<u8> }
 /// assert_eq!(TypeId::of::<Data1>(), TypeId::of::<Data2>());
-/// assert_neq!(TypeId::of::<Data1>(), TypeId::of::<Data3>());
+/// assert_ne!(TypeId::of::<Data1>(), TypeId::of::<Data3>());
 /// ```
 /// This system does not implement internal mutability. Instead, use the following pattern:
 /// ```rust
+/// use sundile_assets::AssetTypeMap;
 /// fn f<T>(assets: &mut AssetTypeMap) where T: 'static {
 ///     let mut taken = assets.try_take_asset::<T>("my_asset");
 ///     // do things here
-///     assets.try_insert_asset(taken);
+///     assets.try_insert_asset("my_asset", taken);
 /// }
 /// ```
 /// TODO: Is this pattern efficient? Perhaps do benchmarks to determine if the size/efficiency tradeoff is worthwhile.
@@ -429,7 +432,7 @@ pub trait RawAssetMapper {
     /// Tip: call RawAsset::load_from_disk internally.
     fn load(&mut self, asset_dir: &PathBuf);
     /// Converts from raw data to the representation used in-game.
-    fn to_asset_map<'a>(self: Box<Self>, asset_builder: &AssetBuildTarget) -> AssetMap;
+    fn to_asset_map(self: Box<Self>, asset_builder: &AssetBuildTarget) -> AssetMap;
     /// Deserializes from bytecode into raw asset data.
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap);
     /// Serializes self from raw asset data to bytecode
@@ -444,12 +447,14 @@ pub type RawAssetMap<'a, AssetType> = HashMap<String, Box<dyn RawAsset<AssetType
 pub struct AssetBuildTarget<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
+    pub texture_layout: &'a wgpu::BindGroupLayout,
 }
 impl<'a> From<&'a HeadlessRenderTarget> for AssetBuildTarget<'a> {
     fn from(other: &'a HeadlessRenderTarget) -> Self {
         AssetBuildTarget {
             device: &other.device,
-            queue: &other.queue
+            queue: &other.queue,
+            texture_layout: &other.texture_layout,
         }
     }
 }
@@ -457,7 +462,8 @@ impl<'a> From<&'a RenderTarget> for AssetBuildTarget<'a> {
     fn from(other: &'a RenderTarget) -> Self {
         AssetBuildTarget {
             device: &other.device,
-            queue: &other.queue
+            queue: &other.queue,
+            texture_layout: &other.texture_layout,
         }
     }
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::*;
 use std::fs::*;
 use std::io::Read;
-use crate::prelude::*;
+use crate::*;
 use sundile_graphics::*;
 
 impl RawAsset<Font> for Font {
@@ -35,7 +35,7 @@ impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load::<Font, Font>(&mut self.map, asset_dir, "fonts", "ttf");
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
+    fn to_asset_map(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
         crate::util::generic_to_asset_map::<Font, Font>(self.map, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {

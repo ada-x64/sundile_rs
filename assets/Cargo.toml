@@ -6,16 +6,18 @@ edition = "2021"
 [dependencies]
 anyhow = "*"
 thiserror = "*"
+
+# TODO: Split this into features.
 bincode = "*"
 serde = {version = "*", features = ["derive"]}
 tobj = "*"
 cgmath = "*"
-wgpu = "*"
 bytemuck = "*"
-naga = "*"
+#naga = "*"
 
 sundile_graphics = { path = "../graphics/" }
 
 [dev-dependencies]
 winit = "*"
 futures = "*"
+

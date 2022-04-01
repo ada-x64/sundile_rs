@@ -2,10 +2,8 @@
 /// Wrappers for text handling, including wgpu_glpyh
 /// 
 
-use crate::prelude::*;
-use futures::{task::SpawnExt, executor::*};
+use crate::prelude::{wgpu::{util::*}, futures::{executor::*, task::SpawnExt}, *};
 use serde::*;
-use wgpu::util::*;
 use wgpu_glyph::*;
 use std::collections::HashMap;
 

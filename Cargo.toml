@@ -6,4 +6,5 @@ members = [
     "core",
     "scripting",
     "frontend",
+    "tools",
 ]

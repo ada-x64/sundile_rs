@@ -4,7 +4,7 @@ use std::io::Read;
 use std::rc::Rc;
 use serde::*;
 
-use crate::prelude::*;
+use crate::*;
 use sundile_graphics::prelude::*;
 
 #[derive(Serialize, Deserialize)]
@@ -77,11 +77,11 @@ impl RawAsset<Model> for ModelData {
     }
 
     fn to_asset(self, builder: &AssetBuildTarget) -> Model {
-        let (device, queue) = (builder.device, builder.queue);
+        let (device, queue, texture_layout) = (builder.device, builder.queue, builder.texture_layout);
 
         let mut materials = vec![];
         for builder in self.material_builders {
-            materials.push(Rc::new(builder.build(device, queue)));
+            materials.push(Rc::new(builder.build(device, queue, texture_layout)));
         }
 
         let mut meshes = vec![];
@@ -98,12 +98,12 @@ impl RawAsset<Model> for ModelData {
 }
 
 
-pub type Mapper = HashMap<String, ModelData>;
+pub type Mapper = std::collections::HashMap<String, ModelData>;
 impl RawAssetMapper for Mapper {
     fn load(&mut self, asset_dir: &PathBuf) {
         crate::util::generic_load(self, asset_dir, "models", "obj",);
     }
-    fn to_asset_map<'a>(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
+    fn to_asset_map(self: Box<Self>, builder: &AssetBuildTarget) -> AssetMap {
         crate::util::generic_to_asset_map(*self, builder)
     }
     fn load_bin_map(&mut self, bin_map: BincodeAssetMap) {

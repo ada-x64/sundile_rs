@@ -1,7 +1,6 @@
-use wgpu;
 use winit;
 use sundile_graphics::prelude::*;
-use sundile_assets::prelude::*;
+use sundile_assets::*;
 use legion::*;
 
 pub struct Renderer<'a> {
@@ -40,7 +39,7 @@ impl<'a> Renderer<'a> {
 
         let camera_bind_group_layout = &camera_wrapper.bind_group_layout;
         let light_bind_group_layout = &light_wrapper.bind_group_layout;
-        let texture_bind_group_layout = Texture::get_bind_group_layout(device);
+        let texture_bind_group_layout = &render_target.texture_layout;
 
         let model_bind_group_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -84,7 +83,7 @@ impl<'a> Renderer<'a> {
                 conservative: false
             },
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: Texture::DEPTH_FORMAT,
+                format: texture::DEPTH_FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState::default(),

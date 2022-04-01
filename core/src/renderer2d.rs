@@ -8,47 +8,10 @@
 // Draw quad w/ color & alpha
 // Draw textured quad
 // Draw text
-use sundile_graphics::prelude::*;
-use sundile_assets::prelude::*;
-use wgpu::*;
-use wgpu::util::*;
+use sundile_graphics::prelude::{wgpu::*, *};
+use sundile_assets::*;
 use std::collections::HashMap;
 use wgpu_glyph::*;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vert2d {
-    position: [f32;3],
-    color: [f32;4],
-    texcoords: [f32;2],
-}
-
-impl Vertex for Vert2d {
-    fn desc<'a>() -> VertexBufferLayout<'a> {
-        use std::mem;
-        VertexBufferLayout {
-            array_stride: mem::size_of::<Vert2d>() as BufferAddress,
-            step_mode: VertexStepMode::Vertex,
-            attributes: &[
-                VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: VertexFormat::Float32x3,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as BufferAddress,
-                    shader_location: 1,
-                    format: VertexFormat::Float32x4,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 7]>() as BufferAddress,
-                    shader_location: 2,
-                    format: VertexFormat::Float32x2,
-                }
-            ],
-        }
-    }
-}
 
 struct Quad<'a> {
     sprite: Option<&'a str>,

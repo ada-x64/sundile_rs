@@ -1,9 +1,8 @@
-use crate::prelude::*;
+use crate::prelude::{*, wgpu::*};
 use anyhow::*;
 // use std::ops::Range;
 use std::{path::Path, rc::Rc};
 use tobj::LoadOptions;
-use wgpu::util::DeviceExt;
 use cgmath::InnerSpace;
 use serde::*;
 use cgmath::*;
@@ -57,15 +56,15 @@ impl Vertex for ModelVertex {
 
 /// A Material is a collection of textures used on a model.
 pub struct Material {
-    pub diffuse_texture: Rc<Texture>,
-    pub normal_texture: Rc<Texture>,
+    pub diffuse_texture: Rc<TextureWrapper>,
+    pub normal_texture: Rc<TextureWrapper>,
     pub bind_group: wgpu::BindGroup,
 }
 impl Material {
     /// Creates a new [Material].
-    pub fn new(label: Option<&str>, diffuse_texture: Rc<Texture>, normal_texture: Rc<Texture>, device: &wgpu::Device) -> Self {
+    pub fn new(label: Option<&str>, diffuse_texture: Rc<TextureWrapper>, normal_texture: Rc<TextureWrapper>, device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout) -> Self {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &Texture::get_bind_group_layout(device),
+            layout: texture_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -118,17 +117,17 @@ impl MaterialBuilder {
     }
     /// Builds the material. This will fail if the textures cannot be created from the passed-in bits.
     /// You might want to pass the newly-created Rc<Texture>'s to an AssetTypeMap.
-    pub fn build(self, device: &wgpu::Device, queue: &wgpu::Queue) -> Material {
+    pub fn build(self, device: &wgpu::Device, queue: &wgpu::Queue, texture_layout: &wgpu::BindGroupLayout) -> Material {
         let name = self.label.unwrap_or("unnamed mesh".to_string());
         let diffuse_texture = Rc::new(
-            Texture::from_bytes(device, queue, &self.diffuse_texture[..], &*format!("{} Diffuse", &name), false)
+            TextureWrapper::from_bytes(device, queue, &self.diffuse_texture[..], &*format!("{} Diffuse", &name), false)
             .unwrap()
         );
         let normal_texture = Rc::new(
-            Texture::from_bytes(device, queue, &self.normal_texture[..], &*format!("{} Normal", &name), true)
+            TextureWrapper::from_bytes(device, queue, &self.normal_texture[..], &*format!("{} Normal", &name), true)
             .unwrap()
         );
-        Material::new(Some(&*name), diffuse_texture, normal_texture, device)
+        Material::new(Some(&*name), diffuse_texture, normal_texture, device, texture_layout)
     }
 }
 
@@ -308,13 +307,13 @@ impl MeshBuilder {
     }
 }
 
-/// The Instance struct defines the position and rotation of a model instance.
+/// The ModelInstance struct defines the position and rotation of a model instance.
 #[derive(Debug)]
-pub struct Instance {
+pub struct ModelInstance {
 	pub position: Vector3<f32>,
 	pub rotation: Quaternion<f32>,
 }
-impl Instance {
+impl ModelInstance {
     /// Creates a new instance at the given position and rotation.
     pub fn new(position: Vector3<f32>, rotation: Quaternion<f32>) -> Self {
         Self {
@@ -403,7 +402,7 @@ impl Vertex for InstanceRaw {
 /// An InstanceCache holds all the instancing information for a particular model.
 #[derive(Debug)]
 pub struct InstanceCache {
-    instances: Vec<Instance>,
+    instances: Vec<ModelInstance>,
     buffer: Option<wgpu::Buffer>,
     dirty: bool,
     // ranges: Vec<Range>,
@@ -418,12 +417,12 @@ impl InstanceCache {
             // ranges: vec![],
         }
     }
-    /// Insert a new [Instance] to the cache.
-    pub fn insert(&mut self, instance: Instance) {
+    /// Insert a new [ModelInstance] to the cache.
+    pub fn insert(&mut self, instance: ModelInstance) {
         self.dirty = true;
         self.instances.push(instance);
     }
-    /// Remove all [Instance]s from the cache.
+    /// Remove all [ModelInstance]s from the cache.
     pub fn clear(&mut self) {
         self.dirty = true;
         self.instances.clear();
@@ -433,7 +432,7 @@ impl InstanceCache {
         if self.dirty {
             self.buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: None,
-                contents: bytemuck::cast_slice(&self.instances.iter().map(Instance::as_raw).collect::<Vec<_>>()),
+                contents: bytemuck::cast_slice(&self.instances.iter().map(ModelInstance::as_raw).collect::<Vec<_>>()),
                 usage: wgpu::BufferUsages::VERTEX,
             }));
         }
@@ -447,7 +446,7 @@ impl InstanceCache {
     }
 }
 
-/// A Model is a collection of [Mesh]s and [Material]s. It is displayed in the world using [Instance]s.
+/// A Model is a collection of [Mesh]s and [Material]s. It is displayed in the world using [ModelInstance]s.
 /// TODO: Make the correlation between meshes and materials embedded in the code instead of relying on indexing.
 /// In particular, there is a one-to-many relationship from materials to meshes. Could be:
 /// HashMap<Rc<Material>, Vec<Rc<Mesh>>>
@@ -459,7 +458,7 @@ pub struct Model {
 }
 impl Model {
     /// This function loads in a model from an OBJ file.
-    pub fn load<P: AsRef<Path>>(device: &wgpu::Device, queue: &wgpu::Queue, path: P) -> Result<Self> {
+    pub fn load<P: AsRef<Path>>(device: &wgpu::Device, queue: &wgpu::Queue, texture_layout: &wgpu::BindGroupLayout, path: P) -> Result<Self> {
         let (obj_models, obj_materials) = tobj::load_obj(
             path.as_ref(),
             &LoadOptions {
@@ -477,15 +476,15 @@ impl Model {
         for mat in obj_materials {
             let diffuse_path = mat.diffuse_texture;
             let diffuse_texture = Rc::new(
-                Texture::load(device, queue, containing_folder.join(diffuse_path), false)?
+                TextureWrapper::load(device, queue, containing_folder.join(diffuse_path), false)?
             );
 
             let normal_path = mat.normal_texture;
             let normal_texture = Rc::new(
-                Texture::load(device, queue, containing_folder.join(normal_path), true)?
+                TextureWrapper::load(device, queue, containing_folder.join(normal_path), true)?
             );
 
-            materials.push(Rc::new(Material::new(Some(mat.name.as_str()), diffuse_texture, normal_texture, &device)));
+            materials.push(Rc::new(Material::new(Some(mat.name.as_str()), diffuse_texture, normal_texture, &device, texture_layout)));
         }
 
         let mut meshes = Vec::new();
