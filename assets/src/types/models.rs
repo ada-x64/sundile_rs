@@ -5,7 +5,7 @@ use std::rc::Rc;
 use serde::*;
 
 use crate::*;
-use sundile_graphics::prelude::*;
+use sundile_graphics::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct ModelData {

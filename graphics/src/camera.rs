@@ -1,6 +1,6 @@
+use sundile_common::{*, time::Time, input::Input};
 use cgmath::*;
 use winit::event::*;
-use std::time::Duration;
 use std::f32::consts::FRAC_PI_2;
 use wgpu::util::DeviceExt;
 
@@ -122,38 +122,25 @@ impl CameraController {
         }
     }
 
-    pub fn process_keys(&mut self, key: VirtualKeyCode, state: ElementState) { //TODO p4: Adapt for controllers
-        let amt = if state == ElementState::Pressed {1.0} else {0.0};
-        match key {
-            VirtualKeyCode::W | VirtualKeyCode::Up => {
-                self.vel.z = amt;
-            }
-            VirtualKeyCode::S | VirtualKeyCode::Down => {
-                self.vel.z = -amt;
-            }
-            VirtualKeyCode::D | VirtualKeyCode::Right => {
-                self.vel.x = amt;
-            }
-            VirtualKeyCode::A | VirtualKeyCode::Left => {
-                self.vel.x = -amt;
-            }
-            VirtualKeyCode::Space => {
-                self.vel.y = amt;
-            }
-            VirtualKeyCode::LShift => {
-                self.vel.y = -amt;
-            }
-            _ => {}
+    pub fn handle_input(&mut self, input: &Input) {
+        // Keys
+        self.vel.z = (input.key_held(VirtualKeyCode::Up) || input.key_held(VirtualKeyCode::W)) as u32 as f32
+            - ((input.key_held(VirtualKeyCode::Down) || input.key_held(VirtualKeyCode::S)) as u32 as f32);
+        self.vel.x = ((input.key_held(VirtualKeyCode::Right) || input.key_held(VirtualKeyCode::D)) as u32 as f32)
+            - ((input.key_held(VirtualKeyCode::Left) || input.key_held(VirtualKeyCode::A)) as u32 as f32);
+        self.vel.y = input.key_held(VirtualKeyCode::Space) as u32 as f32
+            - (input.key_held(VirtualKeyCode::LShift) as u32 as f32);
+
+        // Cursor
+        if input.mb_held(MouseButton::Left) {
+        let (dx, dy) = input.cursor_diff();
+        self.rot.x = Rad(dx as f32);
+        self.rot.y = Rad(dy as f32);
         }
     }
 
-    pub fn process_cursor(&mut self, dx: f64, dy: f64) {
-        self.rot.x = Rad(dx as f32);
-        self.rot.y = Rad(dy as f32);
-    }
-
-    pub fn update(&mut self, cam: &mut Camera, dt: Duration) {
-        let dt = dt.as_secs_f32();
+    pub fn update(&mut self, cam: &mut Camera, dt: Time) {
+        let dt = dt.as_secs() as f32; //this for legacy reasons
 
         // vel
         let (yaw_sin, yaw_cos) = cam.yaw.sin_cos();
@@ -188,7 +175,6 @@ pub struct CameraWrapper {
     pub bind_group_layout: wgpu::BindGroupLayout,
 	pub controller: CameraController,
     pub projection: Projection,
-    mouse_pressed: bool,
 }
 
 impl CameraWrapper {
@@ -243,36 +229,16 @@ impl CameraWrapper {
             bind_group,
             controller,
             projection,
-            mouse_pressed: false,
         }
     }
 
-    pub fn update(&mut self, dt: Duration) {
+    pub fn update(&mut self, dt: Time) {
 		self.controller.update(&mut self.camera, dt);
 		self.uniform.update_view_proj(&self.camera, &self.projection);
     }
 
-    pub fn handle_input(&mut self, event: &DeviceEvent) { //TODO: Replace with Input struct
-        match event {
-            DeviceEvent::Key(
-                KeyboardInput {
-                virtual_keycode: Some(key),
-                state,
-                ..
-            }) => self.controller.process_keys(*key, *state),
-            DeviceEvent::Button {
-                button: 1,
-                state,
-            } => {
-                self.mouse_pressed = *state == ElementState::Pressed;
-            }
-            DeviceEvent::MouseMotion { delta } => {
-                if self.mouse_pressed {
-                    self.controller.process_cursor(delta.0, delta.1);
-                }
-            }
-            _ => {}
-        }
+    pub fn handle_input(&mut self, input: &Input) {
+        self.controller.handle_input(&input);
     }
 
     pub fn render(&self, queue: &wgpu::Queue) {

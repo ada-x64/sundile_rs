@@ -2,9 +2,10 @@
 resolver = "2"
 members = [
     "assets",
-    "graphics",
+    "common",
     "core",
-    "scripting",
     "frontend",
+    "graphics",
+    "scripting",
     "tools",
 ]

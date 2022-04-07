@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+use sundile_common::*;
 
 pub mod camera;
 pub mod texture;
@@ -19,8 +19,7 @@ pub mod prelude {
         text::*,
         texture_atlas::*,
     };
-    pub mod futures {pub use futures::*;}
-    pub mod wgpu {pub use wgpu::*; pub use wgpu::util::*;}
+    pub use image;
 }
 pub use prelude::*;
 

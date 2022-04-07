@@ -6,19 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = "*"
-winit = "*"
-cgmath = "*"
-wgpu = { version = "*", features = ["trace", "webgl", "spirv"] }
-pollster = "*"
-bytemuck = {version = "*", features = [ "derive" ]}
-tobj = "*"
-anyhow = "*"
-rayon = "*"
-rand = "*"
-chrono = "*"
-futures = "*"
-wgpu_glyph = "*"
-serde = "*"
+sundile_common = { path = "../common" }
 
-# sundile_scripting = { path = "../scripting"}
+bytemuck = {version = "1.9", features = [ "derive" ]}
+cgmath = "0.18"
+tobj = "3.2"
+chrono = {version = "0.4", features = ["wasmbind"]}
+wgpu_glyph = "0.16"
+serde = "1.0"
+
+[target.'cfg(target_arch="wasm32")'.dependencies.image]
+version = "0.24"
+default-features = false
+features = ["gif", "ico", "png", "pnm", "tga", "webp", "bmp", "hdr", "dxt", "dds", "farbfeld", "openexr"] #remove tiff, jpeg, jpeg-rayon bc rayon
+
+[target.'cfg(not(target_arch="wasm32"))'.dependencies.image]
+version = "0.24"
+default-features = true

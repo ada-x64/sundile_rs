@@ -107,25 +107,24 @@ pub struct RenderTarget {
 impl RenderTarget {
     pub async fn new(window: &winit::window::Window, enable_tracing: bool, label: Option<&str>) -> Self {
         let size = window.inner_size();
-        #[cfg(target_arch="wasm32")]
-        let instance = wgpu::Instance::new(wgpu::Backends::BROWSER_WEBGPU);
-        #[cfg(not(target_arch="wasm32"))]
         let instance = wgpu::Instance::new(wgpu::Backends::all());
         let surface = unsafe { instance.create_surface(&window) };
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
+                power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             },
-        ).await.unwrap();
+        ).await.expect("Failed to create adapter!");
 
         let mut trace_path = None;
         let dir = format!("./dbg/trace/{}__{}", chrono::Local::now().format("%F-%s"), label.unwrap_or_else(|| "UNLABLED"));
         let path = std::path::Path::new(&*dir);
         if enable_tracing {
+            use log::debug;
             std::fs::create_dir_all(&path).expect("Unable to create tracing path!");
             trace_path = Some(path);
+            debug!("Render target tracing enabled.");
         }
 
         #[cfg(target_arch="wasm32")]
@@ -135,7 +134,7 @@ impl RenderTarget {
 
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
-                features: wgpu::Features::SPIRV_SHADER_PASSTHROUGH,
+                features: wgpu::Features::default(),
                 limits,
                 label,
             },
@@ -153,7 +152,7 @@ impl RenderTarget {
         };
 
         surface.configure(&device, &config);
-
+        
         Self {
             adapter,
             config,
@@ -177,13 +176,13 @@ impl RenderTarget {
             );
             self.encoder = Some(
                 self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Renderer Encoder"),
+                    label: Some("Render Target Encoder"),
                 })
             );
             self.color_view = Some(
                 self.surface_texture.as_ref().unwrap().texture
                 .create_view(&wgpu::TextureViewDescriptor {
-                    label: Some("Renderer Texture View"),
+                    label: Some("Render Target Texture View"),
                     format: Some(self.surface.get_preferred_format(&self.adapter).unwrap()),
                     ..Default::default()
                 })
@@ -196,7 +195,7 @@ impl RenderTarget {
 
     pub fn get_render_pass(&mut self, clear: bool, use_depth_stencil: bool,) -> wgpu::RenderPass {
         self.encoder.as_mut().unwrap().begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Renderer Pass"),
+                label: Some("Render Pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
                     view: self.color_view.as_ref().unwrap(),
                     resolve_target: None,

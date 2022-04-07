@@ -1,5 +1,6 @@
 pub mod prelude {
-    pub use sundile_graphics::prelude::*;
+    pub use sundile_common::*;
+    pub use sundile_graphics::*;
     pub use sundile_core::game::Game;
     pub mod egui {pub use egui::*;}
 }
@@ -7,6 +8,8 @@ pub use prelude::*;
 use prelude::egui::*;
 
 use std::collections::HashMap;
+
+// TODO: Implement a modified egui_wgpu_backend to account for WebGL buffer sizes. cf https://github.com/gfx-rs/wgpu/issues/2573
 
 /// Type alias for [egui_wgpu_backend::RenderPass]. This may change!
 pub type DebugGuiRenderer = egui_wgpu_backend::RenderPass;
@@ -22,21 +25,25 @@ struct DebugWindowWrapper {
     open: bool,
 }
 
-pub struct DebugGui<'a> {
+pub struct DebugGui {
     platform: egui_winit::State,
     renderer: DebugGuiRenderer,
     context: Context,
-    debug_windows: HashMap<&'a str, DebugWindowWrapper>,
+    debug_windows: HashMap<String, DebugWindowWrapper>,
 
     pub open: bool,
 }
 
-impl<'a> DebugGui<'a> {
-    pub fn new(render_target: &RenderTarget, window: &winit::window::Window, debug_windows: HashMap<&'a str, Box<dyn DebugWindow>>, open: bool) -> Self {
+impl DebugGui {
+    pub fn new(render_target: &RenderTarget, window: &winit::window::Window, debug_windows: HashMap<String, Box<dyn DebugWindow>>, open: bool) -> Self {
         let platform = egui_winit::State::new(render_target.device.limits().max_texture_dimension_2d as usize, &window);
 
         // Why does this have to be Bgra..?
-        let renderer = DebugGuiRenderer::new(&render_target.device, wgpu::TextureFormat::Bgra8UnormSrgb, 1);
+        let renderer = DebugGuiRenderer::new(
+            &render_target.device,
+            render_target.surface.get_preferred_format(&render_target.adapter).unwrap(),
+            1
+        );
 
         let debug_windows = HashMap::from_iter(
             debug_windows.into_iter().map(|(name, window)| {
@@ -53,56 +60,37 @@ impl<'a> DebugGui<'a> {
         }
     }
 
-    /// Handles the winit event. If this returns true, the event can be reused.
-    pub fn handle_event<'e>(&mut self, event: winit::event::WindowEvent<'e>, control_flow: &mut winit::event_loop::ControlFlow) -> Option<winit::event::WindowEvent<'e>> {
-        use winit::{event::*, event_loop::*};
-        let mut exclusive_use = false;
-        match event {
-            WindowEvent::CloseRequested => {
-                *control_flow = ControlFlow::Exit;
-            },
-            WindowEvent::KeyboardInput {input, ..} => {
-                if input.state == ElementState::Released {
-                    match input.virtual_keycode {
-                        Some(code) => {
-                            match code {
-                                VirtualKeyCode::F5 => {
-                                    self.open = !self.open;
-                                    exclusive_use = true;
-                                }
-                                VirtualKeyCode::Escape => {
-                                    *control_flow = ControlFlow::Exit;
-                                    exclusive_use = true;
-                                }
-                                _ => {}
-                            }
-                        }
-                        None => {}
-                    }
-                }
-            },
-            _ => {
+    /// Handles the winit event. Will return None if egui wants exclusive control.
+    pub fn handle_event<'e, T>(&mut self, event: winit::event::Event<'e, T>) -> Option<winit::event::Event<'e, T>> {
+        if let winit::event::Event::WindowEvent{ event: window_event, .. } = &event {
+            if self.open && self.platform.on_event(&self.context, window_event) {
+                None
+            }
+            else {
+                Some(event)
             }
         }
-        if self.platform.on_event(&self.context, &event) && !exclusive_use {
-            Some(event)
-        }
         else {
-            None
+            Some(event)
         }
     }
 
-    pub fn render(&mut self, render_target: &mut RenderTarget, window: &winit::window::Window, game: &mut Game) {
-        //
-        // Send to egui
-        //
+    pub fn render(&mut self, render_target: &mut RenderTarget, window: &winit::window::Window, game: &mut Game, fps: f64) {
+
+        if !self.open {return;}
         self.context.begin_frame(self.platform.take_egui_input(&window));
 
         // Iterate through debug windows...
         SidePanel::left("window_picker").show(&self.context, |ui| {
+            ui.label("sundile 0.1.0");
+            ui.label(format!("{:.2} fps",fps));
+            ui.label("(press F5 to toggle this GUI)");
+            ui.label("(press ESC to quit)");
+            ui.separator();
+
             ScrollArea::vertical().show(ui, |ui| {
                 for (name, wrapper) in &mut self.debug_windows {
-                    if ui.button(*name).clicked() {
+                    if ui.button(name).clicked() {
                         wrapper.open = true;
                     }
                     if wrapper.open {

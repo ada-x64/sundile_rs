@@ -1,3 +1,7 @@
+use sundile_common::*;
+use sundile_graphics::HeadlessRenderTarget;
+use sundile_graphics::RenderTarget;
+
 use std::any::*;
 use std::collections::HashMap;
 use std::path::*;
@@ -6,9 +10,6 @@ use anyhow::*;
 use std::result::Result::{Ok, Err};
 use thiserror::Error;
 
-use sundile_graphics::prelude::HeadlessRenderTarget;
-use sundile_graphics::render_target::RenderTarget;
-use sundile_graphics::prelude::wgpu;
 
 // ---
 // The below types deal with Assets as they are presented to the game.
@@ -430,6 +431,7 @@ pub trait RawAsset<AssetType> where AssetType : Any {
 pub trait RawAssetMapper {
     /// Loads all relevant files from disk.
     /// Tip: call RawAsset::load_from_disk internally.
+    /// TODO: This should return a Result, so compilation could (optionally) continue.
     fn load(&mut self, asset_dir: &PathBuf);
     /// Converts from raw data to the representation used in-game.
     fn to_asset_map(self: Box<Self>, asset_builder: &AssetBuildTarget) -> AssetMap;

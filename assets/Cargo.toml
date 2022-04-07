@@ -4,20 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "*"
-thiserror = "*"
-
-# TODO: Split this into features.
-bincode = "*"
-serde = {version = "*", features = ["derive"]}
-tobj = "*"
-cgmath = "*"
-bytemuck = "*"
-#naga = "*"
-
+#general
+bincode = "1.3"
+serde = {version = "1.0", features = ["derive"]}
+sundile_common = { path = "../common/"}
 sundile_graphics = { path = "../graphics/" }
 
-[dev-dependencies]
-winit = "*"
-futures = "*"
+#models
+tobj = { version = "3.2", optional = true }
+cgmath = { version = "0.18", optional = true }
 
+[features]
+default = ["models", "shaders", "fonts", "textures"]
+models = ["tobj", "cgmath"]
+shaders = []
+fonts = []
+textures = []

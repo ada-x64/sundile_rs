@@ -1,10 +1,13 @@
-pub use sundile_scripting::prelude::*;
-pub use sundile_graphics::prelude::*;
+pub use sundile_common::*;
+pub use sundile_scripting::*;
+pub use sundile_graphics::*;
 pub use sundile_assets::*;
 pub use crate::debug_gui::*;
 pub use crate::Engine;
 pub use winit::{window::WindowBuilder, event_loop::EventLoop};
 use std::collections::HashMap;
+pub use log;
+use log::debug;
 
 /// Builder for the game engine. 
 pub struct EngineBuilder<'a> {
@@ -16,8 +19,18 @@ pub struct EngineBuilder<'a> {
     asset_builders: Vec<Box<dyn AssetBuilder + 'a>>,
 }
 impl<'a> EngineBuilder<'a> {
-    /// Creates a new EngineBuilder.
+    /// Creates a new EngineBuilder and initializes Sundile. This should be the first thing you call.
     pub fn new() -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            env_logger::init();
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+            console_log::init_with_level(log::Level::Warn).expect("could not initialize logger");
+        }
+
         Self {
             window_builder: None,
             render_target_builder: None,
@@ -26,6 +39,11 @@ impl<'a> EngineBuilder<'a> {
             debug_gui_builder: None,
             asset_builders: vec![],
         }
+    }
+    /// Sets the log level.
+    pub fn with_log_level(self, level_filter: log::LevelFilter) -> Self {
+        log::set_max_level(level_filter);
+        self
     }
     /// Overrides the default window. For more info see [winit::WindowBuilder]
     pub fn with_window(mut self, window_builder: WindowBuilder) -> Self {
@@ -58,18 +76,31 @@ impl<'a> EngineBuilder<'a> {
         self
     }
     /// Builds the game engine
-    pub fn build(self) -> Engine<'a> {
-
+    pub fn build(self) -> Engine {
+        debug!("Building engine...");
         let event_loop = EventLoop::new();
         let window = self.window_builder.unwrap_or(WindowBuilder::new()).build(&event_loop).expect("Unable to build window!");
+        #[cfg(target_arch="wasm32")]
+        {
+            // Append the canvas to the document body.
+            use winit::platform::web::WindowExtWebSys;
+            let web_window = web_sys::window().unwrap();
+            let doc = web_window.document().unwrap();
+            let body = doc.body().unwrap();
+            body.append_child(&window.canvas()).unwrap();
+            debug!("Canvas created.");
+        }
+
         let render_target = self.render_target_builder.unwrap_or(RenderTargetBuilder::new(None, false)).build(&window);
         let mut assets = self.asset_typemap_builder.unwrap_or(AssetTypeMapBuilder::new()).build(&render_target);
         let debug_gui = self.debug_gui_builder.unwrap_or(DebugGuiBuilder::new()).build(&render_target, &window);
         let scene_map = self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).build();
 
         for asset_builder in self.asset_builders {
+            debug!("Building Ext Asset");
             asset_builder.build(&render_target, &mut assets);
         }
+        debug!("...Engine build finished");
 
         Engine {
             event_loop,
@@ -83,6 +114,7 @@ impl<'a> EngineBuilder<'a> {
 }
 
 /// Builder for DebugGui. Takes structs that implement DebugWindow and adds them to a list to be used internally.
+/// TODO: Add option to remove DebugGui from the build.
 pub struct DebugGuiBuilder<'a> {
     debug_windows: HashMap<&'a str, Box<dyn DebugWindow>>,
     open: bool,
@@ -101,7 +133,7 @@ impl<'a> DebugGuiBuilder<'a> {
         self
     }
     /// Sets whether the debug gui is open at startup.
-    pub fn with_open_status(mut self, open: bool) -> Self {
+    pub fn with_open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
@@ -112,8 +144,10 @@ impl<'a> DebugGuiBuilder<'a> {
         self
     }
     /// Builds the debug gui. Should only be used internally.
-    pub(crate) fn build(self, render_target: &RenderTarget, window: &winit::window::Window,) -> DebugGui<'a> {
-        DebugGui::new(render_target, window, self.debug_windows, self.open)
+    pub(crate) fn build(self, render_target: &RenderTarget, window: &winit::window::Window,) -> DebugGui {
+        debug!("Building DebugGui");
+        let debug_windows = HashMap::from_iter(self.debug_windows.into_iter().map(|(key, value)| (key.to_string(), value)));
+        DebugGui::new(render_target, window, debug_windows, self.open)
     }
 }
 
@@ -140,6 +174,7 @@ impl SceneMapBuilder {
     }
     /// Used to build the SceneMap. Should only be used internally.
     pub(crate) fn build(self) -> SceneMap {
+        debug!("Building SceneMap");
         self.map
     }
 }
@@ -176,6 +211,7 @@ impl<'a> AssetTypeMapBuilder<'a> {
     }
     /// Builds the AssetTypeMap
     pub(crate) fn build(mut self, render_target: &RenderTarget) -> AssetTypeMap {
+        debug!("Building AssetMap");
         match self.deserializer {
             Some(de) => {
                 self.map.try_combine(de.deserialize(self.bin.unwrap(), render_target)).unwrap();
@@ -206,6 +242,7 @@ impl<'a> RenderTargetBuilder<'a> {
         }
     }
     pub(crate) fn build(self, window: &winit::window::Window) -> RenderTarget {
+        debug!("Building RenderTarget");
         futures::executor::block_on(
             RenderTarget::new(window, self.enable_tracing, self.label)
         )

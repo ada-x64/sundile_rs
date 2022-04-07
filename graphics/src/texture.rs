@@ -1,3 +1,4 @@
+use sundile_common::*;
 use image::GenericImageView;
 use anyhow::*;
 use std::path::Path;
@@ -18,6 +19,10 @@ impl TextureWrapper {
     pub fn load<P: AsRef<Path>>(device: &wgpu::Device, queue: &wgpu::Queue, path: P, is_normal_map: bool,) -> Result<Self> {
         let path_copy = path.as_ref().to_path_buf();
         let label = path_copy.to_str();
+        #[cfg(target_arch="wasm32")]
+        if path_copy.ends_with(".jpg") || path_copy.ends_with(".jpeg") || path_copy.ends_with(".tiff") {
+            return Err(anyhow!("JPEG and TIFF are not supported for web builds!"));
+        }
         let img = image::open(path)?;
         Self::from_image(device, queue, &img, label, is_normal_map)
     }

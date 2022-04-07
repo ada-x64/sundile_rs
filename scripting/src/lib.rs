@@ -5,7 +5,9 @@ pub mod scene;
 pub mod prelude {
     pub use crate::components::*;
     pub use crate::scene::*;
+    pub use legion;
 }
+pub use prelude::*;
 
 // Global API struct that acts as as bridge between API functions and Game struct.
 // /// Maybe move debug_gui here?

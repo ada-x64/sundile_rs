@@ -1,11 +1,6 @@
 // internal modules
 pub mod debug_gui;
 pub mod builders;
-use debug_gui::*;
-
-// external crates
-use winit::{event_loop::*, window::*};
-use std::time::*;
 
 // exports
 pub mod prelude {
@@ -13,24 +8,32 @@ pub mod prelude {
     pub mod graphics { pub use sundile_graphics::*; }
     pub mod assets { pub use sundile_assets::*; }
     pub mod scripting { pub use sundile_scripting::*; }
+    pub use sundile_common::*;
     pub use self::core::*;
-    pub use crate::builders;
+    pub use crate::builders::*;
     pub use crate::debug_gui;
 }
+use egui_winit::winit::event::VirtualKeyCode;
 pub use prelude::*;
-use prelude::{assets::*, builders::*};
+use winit::window::*;
+use wasm_bindgen::prelude::wasm_bindgen;
+use log::*;
 
-pub struct Engine<'a> {
+//NOTE: Because this is wasm_bindgen, it *cannot* have a lifetime or type parameter!
+#[wasm_bindgen]
+pub struct Engine {
     event_loop: EventLoop<()>,
     window: Window,
     render_target: RenderTarget,
     assets: AssetTypeMap,
     scene_map: SceneMap,
-    debug_gui: DebugGui<'a>,
+    debug_gui: DebugGui,
 }
-impl Engine<'static> {
-
-    fn run_internal(self) {
+#[wasm_bindgen]
+impl Engine {
+    /// Runs the game.
+    /// Note, this hands execution of the main thread over to winit, so make sure this is the last thing you call!
+    pub fn run(self) {
         let (
             event_loop,
             window,
@@ -47,67 +50,44 @@ impl Engine<'static> {
             self.debug_gui
         );
 
-        let mut game = Game::new(&render_target, assets, scene_map, None, !debug_gui.open);
+        let mut game = Game::new(&render_target, assets, scene_map, None, debug_gui.open);
         let mut fps = 0.0;
-        let mut prev_time = Instant::now();
-     
+        let mut timer = time::Timer::new();
+        let mut input = Input::new();
+
         event_loop.run(move |event, _, control_flow| {
-            game.paused = !debug_gui.open;
-            match event {
-                winit::event::Event::MainEventsCleared => {
-                    let time = Instant::now();
-                    let dt = time - prev_time;
-                    prev_time = time;
-    
-                    let smoothing = 0.9;
-                    fps = fps*smoothing + (1.0-smoothing)/dt.as_secs_f64();
-                    game.update(dt);
-                    
-                    render_target.begin_frame();
-                    game.render(&mut render_target);
-                    debug_gui.render(&mut render_target, &window, &mut game);
-                    render_target.end_frame();
-                },
-                winit::event::Event::WindowEvent {window_id, event}
-                    if window_id == window.id() => {
-                        
-                    match debug_gui.handle_event(event, control_flow) {
-                        Some(_event) => {
-                            //perhaps pass to game here?
+            match debug_gui.handle_event(event) {
+                Some (event) => {
+                    if input.update(&event) {
+                        if input.key_pressed(VirtualKeyCode::F5) {
+                            debug_gui.open = !debug_gui.open;
+                            game.paused = debug_gui.open;
                         }
-                        _ => {}
+                        if input.key_pressed(VirtualKeyCode::Escape) {
+                            *control_flow = winit::event_loop::ControlFlow::Exit;
+                            warn!("Exiting");
+                        }
+                        game.handle_input(&input);
+        
+                        let dt = timer.elapsed();
+                        timer.start();
+        
+                        let smoothing = 0.9;
+                        if dt.as_secs() != 0.0 {
+                            fps = fps*smoothing + (1.0-smoothing)/(dt.as_secs());
+                        }
+                        game.update(dt);
+                        
+                        render_target.begin_frame();
+                        game.render(&mut render_target);
+                        debug_gui.render(&mut render_target, &window, &mut game, fps);
+                        render_target.end_frame();
+
+                        input.step();
                     }
-                },
-                //TODO : ensure device event is for this window!
-                winit::event::Event::DeviceEvent {ref event, ..} => {
-                    game.handle_input(&event);
-                },
-                _ => {}
+                }
+                None => {},
             }
         });
-    }
-
-    /// Runs the game.
-    /// Note that this hands control of the main thread to winit. Be sure this is the last thing you call!
-    pub fn run(self) -> () {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            self.run_internal();
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init().expect("could not initialize logger");
-            // Append the canvas to the document body.
-            use winit::platform::web::WindowExtWebSys;
-    
-            let web_window = web_sys::window().unwrap();
-            let doc = web_window.document().unwrap();
-            let body = doc.body().unwrap();
-            body.append_child(&self.window.canvas()).unwrap();
-    
-            self.run_internal();
-        }
-
     }
 }

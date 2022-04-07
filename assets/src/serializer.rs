@@ -1,7 +1,9 @@
 
+use sundile_common::*;
 use std::collections::HashMap;
 use std::path::*;
 use crate::*;
+use log::info;
 
 /// Loads asset data into a binary. Intended to be used in build scripts to statically load assets.
 pub struct Serializer<'a> {
@@ -38,9 +40,12 @@ impl<'a> Serializer<'a> {
     /// Iterates over the given compilers, loads and serializes the data, outputs that data to out_path/data.bin, and returns the binary.
     // TODO: Should this function be responsible for caching or should we shunt that to the individual asset compilers?
     pub fn serialize(self) -> Vec<u8> {
+        info!("Serializing assets...");
+
         let out_path = self.out_path
             .unwrap_or("./".into())
             .join("data.bin");
+
         let in_path = self.asset_directory
             .unwrap_or("./assets/".into());
 
@@ -54,8 +59,9 @@ impl<'a> Serializer<'a> {
 
         use std::io::Write;
         std::fs::File::create(out_path).expect("Unable to create file at out_path")
-            .write(&bin[..]).expect("Unable to write to data.bin");
+            .write(&bin[..]).expect("Unable to write to bin");
 
+        info!("...Done!");
         bin
     }
 }
@@ -97,6 +103,7 @@ impl<'a> Deserializer<'a> {
     /// Parses the bin. May panic if it cannot parse the binary into an AssetTypeMap or if no mapper exists for an asset type within that binary.
     pub fn deserialize<'f, BuilderType>(self, bin: &[u8], asset_builder: &'f BuilderType) -> AssetTypeMap
     where &'f BuilderType: Into<AssetBuildTarget<'f>> {
+        info!("Deserializing assets...");
         let builder = asset_builder.into();
         let mut map_in = bincode::deserialize::<BincodeAssetTypeMap>(bin).expect("Unable to read bin!");
         let mut map_out = AssetTypeMap::new();
@@ -114,6 +121,7 @@ impl<'a> Deserializer<'a> {
             panic!("Binary not fully read.")
         }
 
+        info!("...Done!");
         map_out
     }
 }

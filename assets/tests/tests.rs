@@ -1,7 +1,7 @@
 use sundile_assets::*;
-use sundile_graphics::prelude::*;
+use sundile_graphics::*;
+use sundile_common::*;
 
-#[cfg(not(target_arch="wasm32"))]
 #[test]
 fn test_all() {
     // --

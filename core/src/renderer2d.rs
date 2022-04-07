@@ -8,10 +8,12 @@
 // Draw quad w/ color & alpha
 // Draw textured quad
 // Draw text
-use sundile_graphics::prelude::{wgpu::*, *};
+use sundile_common::*;
+use sundile_graphics::*;
 use sundile_assets::*;
 use std::collections::HashMap;
 use wgpu_glyph::*;
+use wgpu::*;
 
 struct Quad<'a> {
     sprite: Option<&'a str>,
@@ -70,11 +72,6 @@ impl<'a> Renderer2d<'a> {
             push_constant_ranges: &[],
         });
 
-        // let shader = device.create_shader_module(&ShaderModuleDescriptor{
-        //     label: Some("Renderer2D Default Shader"),
-        //     source: ShaderSource::Wgsl(assets.shaders["2d"].clone().into()),
-        // });
-
         let shader = assets.try_get_asset::<wgpu::ShaderModule>("2d").unwrap();
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -112,16 +109,17 @@ impl<'a> Renderer2d<'a> {
             multiview: None,
         });
 
-        let text_wrapper = TextWrapper::new(&render_target, assets.try_take_asset_map::<Font>().unwrap());
+        let text_wrapper = TextWrapper::new(&render_target, assets.try_take_asset_map::<Font>().ok());
 
         // let texture_atlas = TextureAtlasBuilder::new()
         //     .with_sprite_sheet("atlas_0", assets.get_asset("textures", "atlas_0"), SpriteSheet::new(16,16,0,0,0,0))
         //     .build();
 
+        //TODO: Actually load in texture atlases!!!
         let texture_atlas = TextureAtlas::new(
             render_target,
             &texture_bind_group_layout,
-            assets.try_take_asset("atlas_0").unwrap(),
+            assets.try_take_asset("test_atlas").unwrap(),
             HashMap::from_iter([
                 ("default".into(), Sprite::new(vec![[0,0]], 16,16, 1, 0.0)),
                 ("circle".into(), Sprite::new(vec![[16,0]], 16, 16, 1, 0.0)),

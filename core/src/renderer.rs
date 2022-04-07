@@ -1,7 +1,7 @@
-use winit;
-use sundile_graphics::prelude::*;
+use sundile_common::*;
+use sundile_graphics::*;
 use sundile_assets::*;
-use legion::*;
+use sundile_scripting::legion::*;
 
 pub struct Renderer<'a> {
     pub viewport: Option<Viewport>,
@@ -41,7 +41,7 @@ impl<'a> Renderer<'a> {
         let light_bind_group_layout = &light_wrapper.bind_group_layout;
         let texture_bind_group_layout = &render_target.texture_layout;
 
-        let model_bind_group_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        let model_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
             bind_group_layouts: &[
                 &texture_bind_group_layout,
@@ -55,7 +55,7 @@ impl<'a> Renderer<'a> {
 
         let model_pipeline =  device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Model Pipeline"),
-            layout: Some(&model_bind_group_layout),
+            layout: Some(&model_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: default_shader.as_ref(),
                 entry_point: "vs_main",
@@ -107,7 +107,7 @@ impl<'a> Renderer<'a> {
         }
     }    
 
-	pub fn update(&mut self, dt: std::time::Duration) {
+	pub fn update(&mut self, dt: sundile_common::time::Time) {
         self.camera_wrapper.update(dt);
 
         // TODO: Lights aren't working. Ambient is fine.
@@ -121,8 +121,8 @@ impl<'a> Renderer<'a> {
         // self.light_wrapper.update_light("test", light).unwrap();
 	}
 
-    pub fn handle_input(&mut self, event: &winit::event::DeviceEvent) {
-        self.camera_wrapper.handle_input(event);
+    pub fn handle_input(&mut self, input: &Input) {
+        self.camera_wrapper.handle_input(input);
     }
     
     pub fn render(&mut self, render_target: &mut RenderTarget, _world: &World, assets: &mut AssetTypeMap) {

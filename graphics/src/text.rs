@@ -1,8 +1,10 @@
 /// text.rs
 /// Wrappers for text handling, including wgpu_glpyh
 /// 
-
-use crate::prelude::{wgpu::{util::*}, futures::{executor::*, task::SpawnExt}, *};
+use sundile_common::*;
+use futures::executor::*;
+use futures::task::SpawnExt;
+use crate::*;
 use serde::*;
 use wgpu_glyph::*;
 use std::collections::HashMap;
@@ -15,7 +17,7 @@ pub struct Font {
 
 pub struct TextWrapper {
     staging_belt: StagingBelt,
-    local_pool: futures::executor::LocalPool,
+    local_pool: LocalPool,
     local_spawner: LocalSpawner,
     brush: GlyphBrush<()>,
     fonts: HashMap<String, FontId>,
@@ -23,7 +25,7 @@ pub struct TextWrapper {
 }
 
 impl TextWrapper {
-    pub fn new(render_target: &RenderTarget, raw_fonts: HashMap<String, Font>) -> Self {
+    pub fn new(render_target: &RenderTarget, raw_fonts: Option<HashMap<String, Font>>) -> Self {
 
         let staging_belt = StagingBelt::new(1024);
         let local_pool = LocalPool::new();
@@ -31,9 +33,17 @@ impl TextWrapper {
 
         let mut fonts = HashMap::<String, FontId>::new();
         let mut font_data  = Vec::<ab_glyph::FontArc>::new();
-        for (name, font) in raw_fonts {
-            fonts.insert(name, FontId(font_data.len()));
-            font_data.push(ab_glyph::FontArc::try_from_vec(font.data.clone()).expect("Unable to register font!"));
+        match raw_fonts {
+            Some(raw_fonts) => {
+                for (name, font) in raw_fonts {
+                    fonts.insert(name, FontId(font_data.len()));
+                    font_data.push(ab_glyph::FontArc::try_from_vec(font.data.clone()).expect("Unable to register font!"));
+                }
+            }
+            None => {
+                use log::warn;
+                warn!("No fonts found!");
+            }
         }
         let brush = GlyphBrushBuilder::using_fonts(font_data).build(&render_target.device, render_target.config.format);
 
