@@ -1,5 +1,7 @@
 # sundile_rs
 
+## [WASM Build Demo](https://ada-x64.itch.io/sundile-wasm-test)
+
 ![3-23-33 debug_gui and simplex_noise](https://user-images.githubusercontent.com/41482263/160485247-2a29fbbb-2f11-4faf-8d1b-2e340250ac71.PNG)
 *Example image showing the Debug GUI and a terrain chunk rendered with [slib_terrain](https://github.com/ada-rose-dev/quell_lib/tree/main/terrain)*
 
