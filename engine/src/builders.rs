@@ -115,7 +115,7 @@ impl<'a> EngineBuilder<'a> {
         let debug_gui = self
             .debug_gui_builder
             .unwrap_or(DebugGuiBuilder::new())
-            .build(&render_target, &window, &event_loop);
+            .build(&render_target, &event_loop);
         let scene_map = self
             .scene_map_builder
             .unwrap_or(SceneMapBuilder::new())
@@ -172,7 +172,6 @@ impl<'a> DebugGuiBuilder<'a> {
     pub(crate) fn build<T>(
         self,
         render_target: &RenderTarget,
-        window: &winit::window::Window,
         event_loop: &winit::event_loop::EventLoopWindowTarget<T>,
     ) -> DebugGui {
         debug!("Building DebugGui");
@@ -181,7 +180,7 @@ impl<'a> DebugGuiBuilder<'a> {
                 .into_iter()
                 .map(|(key, value)| (key.to_string(), value)),
         );
-        DebugGui::new(render_target, window, event_loop, debug_windows, self.open)
+        DebugGui::new(render_target, event_loop, debug_windows, self.open)
     }
 }
 

@@ -46,7 +46,6 @@ pub struct DebugGui {
 impl DebugGui {
     pub fn new<T>(
         render_target: &RenderTarget,
-        window: &winit::window::Window,
         event_loop: &winit::event_loop::EventLoopWindowTarget<T>,
         debug_windows: HashMap<String, Box<dyn DebugWindow>>,
         open: bool,

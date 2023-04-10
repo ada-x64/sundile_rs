@@ -14,8 +14,6 @@ pub struct Game<'a> {
     scenes: SceneMap, //TODO: Possibly move this outside of Game struct so DebugGui has ability to change scenes?
 }
 
-fn default_scene() {}
-
 fn load_default_assets(render_target: &RenderTarget, assets: &mut AssetTypeMap) {
     use log::info;
     use wgpu::*;
