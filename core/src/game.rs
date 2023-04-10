@@ -2,114 +2,24 @@ use sundile_assets::*;
 use sundile_common::*;
 use sundile_graphics::*;
 
+use crate::defaults::default_scene;
+use crate::defaults::load_default_assets;
 use crate::renderer::*;
 use crate::renderer2d::*;
+use crate::SceneBuilder;
+use crate::SceneFn;
 use crate::SceneMap;
 
-pub struct Game<'a> {
-    pub renderer: Renderer<'a>,
-    pub renderer2d: Renderer2d<'a>,
+pub struct Game {
+    pub renderer: Renderer,
+    pub renderer2d: Renderer2d,
     pub paused: bool,
     pub assets: AssetTypeMap,
     scenes: SceneMap, //TODO: Possibly move this outside of Game struct so DebugGui has ability to change scenes?
+    scene_initialized: bool,
 }
 
-fn load_default_assets(render_target: &RenderTarget, assets: &mut AssetTypeMap) {
-    use log::info;
-    use wgpu::*;
-
-    // Shaders
-    if assets.try_get_asset::<ShaderModule>("default").is_err() {
-        let asset = render_target
-            .device
-            .create_shader_module(include_wgsl!("../assets/shaders/default.wgsl"));
-        assets.try_insert_asset("default", asset).unwrap();
-    } else {
-        info!("Default shader overriden!");
-    }
-    if assets.try_get_asset::<ShaderModule>("2d").is_err() {
-        let asset = render_target
-            .device
-            .create_shader_module(include_wgsl!("../assets/shaders/2d.wgsl"));
-        assets.try_insert_asset("2d", asset).unwrap();
-    } else {
-        info!("Default 2d shader overriden!");
-    }
-    if assets.try_get_asset::<ShaderModule>("passthrough").is_err() {
-        let asset = render_target
-            .device
-            .create_shader_module(include_wgsl!("../assets/shaders/passthrough.wgsl"));
-        assets.try_insert_asset("passthrough", asset).unwrap();
-    } else {
-        info!("Passthrough shader overriden!");
-    }
-
-    // Fonts
-    if assets.try_get_asset::<Font>("regular").is_err() {
-        assets
-            .try_insert_asset(
-                "regular",
-                Font {
-                    data: include_bytes!("../assets/fonts/UBUNTUMONO-R.TTF").to_vec(),
-                },
-            )
-            .unwrap();
-    } else {
-        info!("Default regular font overriden!");
-    }
-    if assets.try_get_asset::<Font>("italic").is_err() {
-        assets
-            .try_insert_asset(
-                "italic",
-                Font {
-                    data: include_bytes!("../assets/fonts/UBUNTUMONO-RI.TTF").to_vec(),
-                },
-            )
-            .unwrap();
-    } else {
-        info!("Default italic font overriden!");
-    }
-    if assets.try_get_asset::<Font>("bold").is_err() {
-        assets
-            .try_insert_asset(
-                "bold",
-                Font {
-                    data: include_bytes!("../assets/fonts/UBUNTUMONO-B.TTF").to_vec(),
-                },
-            )
-            .unwrap();
-    } else {
-        info!("Default bold font overriden!");
-    }
-    if assets.try_get_asset::<Font>("oblique").is_err() {
-        assets
-            .try_insert_asset(
-                "oblique",
-                Font {
-                    data: include_bytes!("../assets/fonts/UBUNTUMONO-BI.TTF").to_vec(),
-                },
-            )
-            .unwrap();
-    } else {
-        info!("Default oblique font overriden!");
-    }
-
-    assets
-        .try_insert_asset(
-            "test_atlas",
-            TextureWrapper::from_bytes(
-                &render_target.device,
-                &render_target.queue,
-                include_bytes!("../assets/textures/test_atlas.png"),
-                "test atlas",
-                false,
-            )
-            .unwrap(),
-        )
-        .unwrap();
-}
-
-impl<'a> Game<'a> {
+impl Game {
     pub fn new(
         render_target: &RenderTarget,
         mut assets: AssetTypeMap,
@@ -128,10 +38,16 @@ impl<'a> Game<'a> {
             paused,
             assets,
             scenes,
+            scene_initialized: false,
         }
     }
 
     pub fn update(&mut self, dt: time::Time) {
+        if !self.scene_initialized {
+            self.scenes
+                .get("default")
+                .unwrap_or(&(default_scene as SceneFn))(Self::get_scene_builder());
+        }
         if self.paused {
             return;
         }
@@ -155,6 +71,10 @@ impl<'a> Game<'a> {
 
     //TODO: Scenes should be assets loaded with AssetManager struct.
     pub fn set_scene<'s>(&mut self, scene: &'s str) {
-        self.scenes[scene]();
+        self.scenes[scene](Self::get_scene_builder());
+    }
+
+    pub fn get_scene_builder() -> SceneBuilder {
+        SceneBuilder::new(todo!())
     }
 }

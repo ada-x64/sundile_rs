@@ -2,16 +2,16 @@ use sundile_assets::*;
 use sundile_common::*;
 use sundile_graphics::*;
 
-pub struct Renderer<'a> {
+pub struct Renderer {
     pub viewport: Option<Viewport>,
 
     pub camera_wrapper: CameraWrapper,
-    pub light_wrapper: LightWrapper<'a>,
+    pub light_wrapper: LightWrapper,
 
     model_pipeline: wgpu::RenderPipeline,
 }
 
-impl<'a> Renderer<'a> {
+impl Renderer {
     pub fn new(
         render_target: &RenderTarget,
         assets: &mut AssetTypeMap,
@@ -32,9 +32,14 @@ impl<'a> Renderer<'a> {
         };
 
         let camera_wrapper = CameraWrapper::new(&device, width, height);
-        let light_wrapper = LightWrapper::new(&device);
-        // light_wrapper.set_ambient(Color::from_rgba(1.0, 1.0, 1.0, 0.1).as_array());
-        // light_wrapper.add_light("test", LightUniform::new([0.0, 1.0, 0.0], [1.0, 1.0, 1.0, 1.0])).unwrap();
+        let mut light_wrapper = LightWrapper::new(&device);
+        light_wrapper.set_ambient(Color::from_rgba(1.0, 1.0, 1.0, 0.1).as_array());
+        light_wrapper
+            .add_light(
+                "test",
+                LightUniform::new([0.0, 1.0, 0.0], [1.0, 1.0, 1.0, 1.0]),
+            )
+            .unwrap();
 
         //
         // Pipelines
@@ -114,14 +119,14 @@ impl<'a> Renderer<'a> {
         self.camera_wrapper.update(dt);
 
         // TODO: Lights aren't working. Ambient is fine.
-        // use cgmath::*;
-        // let mut light = self.light_wrapper.get_light("test").unwrap();
-        // light.position = [
-        //     light.position[0] + Angle::cos(Rad::<f32>(std::f32::consts::PI * dt.as_secs_f32())),
-        //     light.position[1],
-        //     light.position[2] + Angle::sin(Rad::<f32>(std::f32::consts::PI * dt.as_secs_f32())),
-        // ];
-        // self.light_wrapper.update_light("test", light).unwrap();
+        use cgmath::*;
+        let mut light = self.light_wrapper.get_light("test").unwrap();
+        light.position = [
+            light.position[0] + Angle::cos(Rad::<f32>(std::f32::consts::PI * dt.as_secs_f32())),
+            light.position[1],
+            light.position[2] + Angle::sin(Rad::<f32>(std::f32::consts::PI * dt.as_secs_f32())),
+        ];
+        self.light_wrapper.update_light("test", light).unwrap();
     }
 
     pub fn handle_input(&mut self, input: &Input) {

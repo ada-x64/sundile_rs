@@ -40,18 +40,18 @@ struct LightBufferUniform {
 
 #[derive(Debug)]
 /// Wrapper for all light operations.
-pub struct LightWrapper<'a> {
+pub struct LightWrapper {
     uniform: LightBufferUniform,
     used_lights: usize,
 
     dirty: bool,
     buffer: Option<Buffer>,
 
-    map: HashMap<&'a str, usize>, //Hashmap that points to stored light uniforms.
+    map: HashMap<&'static str, usize>, //Hashmap that points to stored light uniforms.
     pub bind_group_layout: BindGroupLayout,
 }
 
-impl<'a> LightWrapper<'a> {
+impl LightWrapper {
     /// Creates a new light wrapper.
     /// Ambient light defaults to [1.0;4].
     pub fn new(device: &Device) -> Self {
@@ -89,7 +89,7 @@ impl<'a> LightWrapper<'a> {
     }
 
     /// Adds a point light uniform.
-    pub fn add_light(&mut self, name: &'a str, light: LightUniform) -> Result<(), &str> {
+    pub fn add_light(&mut self, name: &'static str, light: LightUniform) -> Result<(), &str> {
         if self.used_lights >= NUM_LIGHTS {
             return Err("Exceeded maximum number of lights!");
         }
@@ -101,7 +101,7 @@ impl<'a> LightWrapper<'a> {
     }
 
     /// Returns a non-mut LightUniform.
-    pub fn get_light(&mut self, name: &'a str) -> Result<LightUniform, &str> {
+    pub fn get_light(&mut self, name: &'static str) -> Result<LightUniform, &str> {
         if !self.map.contains_key(name) {
             return Err("Cannot find light.");
         }
@@ -109,7 +109,7 @@ impl<'a> LightWrapper<'a> {
     }
 
     /// Replace the currently stored light uniform with a new one.
-    pub fn update_light(&mut self, name: &'a str, light: LightUniform) -> Result<(), &str> {
+    pub fn update_light(&mut self, name: &'static str, light: LightUniform) -> Result<(), &str> {
         if !self.map.contains_key(name) {
             return Err("Cannot find light.");
         }
@@ -119,7 +119,7 @@ impl<'a> LightWrapper<'a> {
     }
 
     /// Removes the currently stored light uniform.
-    pub fn remove_light(&mut self, name: &'a str) -> Result<(), &str> {
+    pub fn remove_light(&mut self, name: &'static str) -> Result<(), &str> {
         if !self.map.contains_key(name) {
             return Err("Cannot find light.");
         }
@@ -156,4 +156,3 @@ impl<'a> LightWrapper<'a> {
         })
     }
 }
-

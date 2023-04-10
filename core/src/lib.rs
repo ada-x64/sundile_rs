@@ -1,3 +1,4 @@
+pub mod defaults;
 pub mod game;
 pub mod renderer;
 pub mod renderer2d;
@@ -10,4 +11,3 @@ pub mod prelude {
     pub use crate::scene::*;
 }
 pub use prelude::*;
-

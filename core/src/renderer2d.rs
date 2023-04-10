@@ -9,33 +9,59 @@
 // Draw text
 use std::collections::HashMap;
 use sundile_assets::AssetTypeMap;
-use sundile_graphics::{Font, RenderTarget, Sprite, TextWrapper, TextureAtlas, Vert2d, Vertex};
+use sundile_graphics::{
+    Color, Font, RenderTarget, Sprite, TextWrapper, TextureAtlas, Vert2d, Vertex,
+};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 use wgpu_glyph::{FontId, Section, Text};
 
-struct Quad<'a> {
-    sprite: Option<&'a str>,
+struct Quad {
+    sprite: Option<&'static str>,
     vertices: [f32; 4],
     color: sundile_graphics::Color,
 }
 
-pub struct Renderer2d<'a> {
+struct SectionBuilder {
+    text: String,
+    pos: (f32, f32),
+    bounds: (f32, f32),
+    color: Color,
+    font_size: f32,
+    current_font: Option<FontId>,
+}
+impl SectionBuilder {
+    /// Build the Section.
+    /// Note: Non-consuming due to lifetime constraints.
+    pub fn build<'a>(&'a self) -> Section<'a> {
+        Section {
+            screen_position: self.pos,
+            bounds: self.bounds,
+            text: vec![Text::new(self.text.as_str())
+                .with_color(self.color.as_array())
+                .with_scale(self.font_size)
+                .with_font_id(self.current_font.unwrap_or(FontId(0)))],
+            ..Section::default()
+        }
+    }
+}
+
+pub struct Renderer2d {
     texture_atlas: TextureAtlas,
-    queue: Vec<Quad<'a>>,
+    queue: Vec<Quad>,
     pipeline: wgpu::RenderPipeline,
     color: sundile_graphics::Color,
     screen_size: [u32; 2],
 
     text_wrapper: TextWrapper,
-    text_queue: Vec<Section<'a>>,
+    text_queue: Vec<SectionBuilder>,
     text_bounds: (f32, f32),
     font_size: f32,
     current_font: Option<FontId>,
 }
 
 #[allow(dead_code)]
-impl<'a> Renderer2d<'a> {
+impl Renderer2d {
     pub fn new(render_target: &RenderTarget, assets: &mut AssetTypeMap) -> Self {
         let (device, config) = (&render_target.device, &render_target.config);
 
@@ -130,7 +156,7 @@ impl<'a> Renderer2d<'a> {
             screen_size: [render_target.config.width, render_target.config.height],
 
             text_wrapper,
-            text_queue: Vec::<Section<'a>>::new(),
+            text_queue: vec![],
             text_bounds: (
                 render_target.config.width as f32,
                 render_target.config.height as f32,
@@ -218,7 +244,7 @@ impl<'a> Renderer2d<'a> {
         // render text
         self.text_wrapper.start_pass();
         while let Some(section) = self.text_queue.pop() {
-            self.text_wrapper.queue_section(section);
+            self.text_wrapper.queue_section(section.build());
         }
         self.text_wrapper.end_pass(render_target);
     }
@@ -295,15 +321,14 @@ impl<'a> Renderer2d<'a> {
     }
 
     /// Draws text at the given pixel coordinates.
-    pub fn draw_text(&mut self, text: &'a str, x: f32, y: f32) {
-        self.text_queue.push(Section {
-            screen_position: (x, y),
+    pub fn draw_text(&mut self, text: String, x: f32, y: f32) {
+        self.text_queue.push(SectionBuilder {
+            text,
+            pos: (x, y),
             bounds: self.text_bounds,
-            text: vec![Text::new(text)
-                .with_color(self.color.as_array())
-                .with_scale(self.font_size)
-                .with_font_id(self.current_font.unwrap_or(FontId(0)))],
-            ..Section::default()
+            color: self.color,
+            font_size: self.font_size,
+            current_font: self.current_font,
         });
     }
 }
