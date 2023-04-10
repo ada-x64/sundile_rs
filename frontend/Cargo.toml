@@ -1,0 +1,15 @@
+[package]
+name = "frontend"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+# local crates
+sundile_graphics = {path="../graphics/"}
+sundile_common = {path="../common/"}
+sundile_assets = {path="../assets/"}
+
+# workspace deps
+wgpu = {workspace = true}
+winit = {workspace = true}
