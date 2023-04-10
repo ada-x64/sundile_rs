@@ -1,0 +1,23 @@
+[package]
+name = "sundile_core"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+# rendering 
+bytemuck = {version = "1.9", features = [ "derive" ]}
+cgmath = "0.18"
+wgpu_glyph = "*"
+
+# internal
+sundile_common = { path = "../common" }
+sundile_graphics = {path = "../graphics/"}
+sundile_assets = { path = "../assets/" }
+
+# workspace
+wgpu = {workspace = true}
+winit = {workspace = true}
+log = {workspace = true}

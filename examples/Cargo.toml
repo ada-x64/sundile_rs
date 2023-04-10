@@ -3,12 +3,12 @@ name = "frontend"
 version = "0.1.0"
 edition = "2021"
 
+[[example]]
+name="basic"
 
 [dependencies]
 # local crates
-sundile_graphics = {path="../graphics/"}
-sundile_common = {path="../common/"}
-sundile_assets = {path="../assets/"}
+sundile = {path="../engine/"}
 
 # workspace deps
 wgpu = {workspace = true}

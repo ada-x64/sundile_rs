@@ -3,8 +3,10 @@ resolver = "2"
 members = [
     "assets",
     "common",
+    "core",
+    "engine",
     "graphics",
-    "frontend",
+    "examples",
 ]
 
 [workspace.dependencies]

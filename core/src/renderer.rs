@@ -1,5 +1,5 @@
 use sundile_assets::*;
-use sundile_common::Input;
+use sundile_common::*;
 use sundile_graphics::*;
 
 pub struct Renderer<'a> {
