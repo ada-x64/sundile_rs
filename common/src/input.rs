@@ -1,17 +1,15 @@
-use winit::{
-    event::*,
-};
+use winit::event::*;
 
 #[derive(Debug, Clone, Copy)]
 enum KeyAction {
     Pressed(VirtualKeyCode),
-    Released(VirtualKeyCode)
+    Released(VirtualKeyCode),
 }
 
 #[derive(Debug, Clone, Copy)]
 enum MouseAction {
     Pressed(MouseButton),
-    Released(MouseButton)
+    Released(MouseButton),
 }
 
 /// This impl makes a few assumptions:
@@ -31,8 +29,8 @@ impl Input {
         Self {
             mouse_actions: vec![],
             key_actions: vec![],
-            key_held: [false;255],
-            mouse_held: [false;255],
+            key_held: [false; 255],
+            mouse_held: [false; 255],
             cursor_pos: None,
             cursor_pos_prev: None,
         }
@@ -40,10 +38,13 @@ impl Input {
 
     pub fn update<T>(&mut self, event: &Event<T>) -> bool {
         match event {
-            Event::WindowEvent { window_id: _, event } => {
+            Event::WindowEvent {
+                window_id: _,
+                event,
+            } => {
                 self.handle_window_event(event);
                 false
-            },
+            }
             Event::MainEventsCleared => true,
             _ => false,
         }
@@ -80,50 +81,59 @@ impl Input {
                 self.cursor_pos = Some((position.x, position.y));
             }
             // Modifiers?
-            WindowEvent::MouseInput {state, button, .. } => {
-                match state {
-                    ElementState::Pressed => {
-                        self.mouse_held[mb_to_index(*button)] = true;
-                        self.mouse_actions.push(MouseAction::Pressed(*button));
-                    },
-                    ElementState::Released => {
-                        self.mouse_held[mb_to_index(*button)] = false;
-                        self.mouse_actions.push(MouseAction::Released(*button));
-                    },
+            WindowEvent::MouseInput { state, button, .. } => match state {
+                ElementState::Pressed => {
+                    self.mouse_held[mb_to_index(*button)] = true;
+                    self.mouse_actions.push(MouseAction::Pressed(*button));
                 }
-            }
+                ElementState::Released => {
+                    self.mouse_held[mb_to_index(*button)] = false;
+                    self.mouse_actions.push(MouseAction::Released(*button));
+                }
+            },
             _ => {}
         }
     }
 
     pub fn key_pressed(&self, key: VirtualKeyCode) -> bool {
-        self.key_actions.iter().find(|action| match **action {
-            KeyAction::Pressed(action_key) => key == action_key,
-            _ => false
-        }).is_some()
+        self.key_actions
+            .iter()
+            .find(|action| match **action {
+                KeyAction::Pressed(action_key) => key == action_key,
+                _ => false,
+            })
+            .is_some()
     }
     pub fn key_released(&self, key: VirtualKeyCode) -> bool {
-        self.key_actions.iter().find(|action| match **action {
-            KeyAction::Released(action_key) => key == action_key,
-            _ => false
-        }).is_some()
+        self.key_actions
+            .iter()
+            .find(|action| match **action {
+                KeyAction::Released(action_key) => key == action_key,
+                _ => false,
+            })
+            .is_some()
     }
     pub fn key_held(&self, key: VirtualKeyCode) -> bool {
         self.key_held[key as usize]
     }
 
-    
     pub fn mb_pressed(&self, button: MouseButton) -> bool {
-        self.mouse_actions.iter().find(|action| match **action {
-            MouseAction::Pressed(action_button) => button == action_button,
-            _ => false
-        }).is_some()
+        self.mouse_actions
+            .iter()
+            .find(|action| match **action {
+                MouseAction::Pressed(action_button) => button == action_button,
+                _ => false,
+            })
+            .is_some()
     }
     pub fn mb_released(&self, button: MouseButton) -> bool {
-        self.mouse_actions.iter().find(|action| match **action {
-            MouseAction::Released(action_button) => button == action_button,
-            _ => false
-        }).is_some()
+        self.mouse_actions
+            .iter()
+            .find(|action| match **action {
+                MouseAction::Released(action_button) => button == action_button,
+                _ => false,
+            })
+            .is_some()
     }
     pub fn mb_held(&self, button: MouseButton) -> bool {
         self.mouse_held[mb_to_index(button)]
@@ -140,7 +150,6 @@ impl Input {
     pub fn cursor_pos(&self) -> Option<(f64, f64)> {
         self.cursor_pos
     }
-
 }
 
 fn mb_to_index(button: MouseButton) -> usize {
@@ -151,3 +160,4 @@ fn mb_to_index(button: MouseButton) -> usize {
         MouseButton::Other(i) => i as usize,
     }
 }
+

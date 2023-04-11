@@ -1,4 +1,3 @@
-use sundile_common::*;
 use sundile_graphics::HeadlessRenderTarget;
 use sundile_graphics::RenderTarget;
 
@@ -6,17 +5,16 @@ use std::any::*;
 use std::collections::HashMap;
 use std::path::*;
 use std::rc::Rc;
-use anyhow::*;
-use std::result::Result::{Ok, Err};
+use std::result::Result::{Err, Ok};
 use thiserror::Error;
-
+use wgpu::{Device, Queue};
 
 // ---
 // The below types deal with Assets as they are presented to the game.
 // ---
 
 /// Error enum for Asset-related functionality.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum AssetError {
     #[error("Could not match asset types.")]
     InvalidType,
@@ -26,13 +24,20 @@ pub enum AssetError {
     AssetMapNotFound,
     #[error("No asset found with given name.")]
     AssetNotFound(String),
+    #[error("IO Error `{0}`")]
+    Io(#[from] std::io::Error),
+}
+impl PartialEq for AssetError {
+    fn eq(&self, other: &Self) -> bool {
+        format!("{self}") == format!("{other}")
+    }
 }
 
 /// Asset storage type required for [AssetMap] / [AssetTypeMap].
 #[derive(Debug)]
 pub struct AssetStorage {
     // TODO: Convert to Arc<Mutex<dyn Any>> and reimplement, cascading upwards.
-    value: Rc<dyn Any>
+    value: Rc<dyn Any>,
 }
 impl std::ops::Deref for AssetStorage {
     type Target = Rc<dyn Any>;
@@ -42,35 +47,45 @@ impl std::ops::Deref for AssetStorage {
 }
 impl AssetStorage {
     /// Constructs a new Asset
-    pub fn new<T>(value: T) -> Self where T: 'static {
+    pub fn new<T>(value: T) -> Self
+    where
+        T: 'static,
+    {
         Self {
             value: Rc::new(value),
         }
     }
     /// Constructs a new asset from a heap-allocated value.
-    pub fn from_ref<T>(value: Rc<T>) -> Self where T:'static {
-        Self {
-            value
-        }
+    pub fn from_ref<T>(value: Rc<T>) -> Self
+    where
+        T: 'static,
+    {
+        Self { value }
     }
     /// Tries to return a reference counted pointer to the underlying asset.
     /// This function fails if the asset is not of type T.
-    pub fn try_get<T>(&self) -> Result<Rc<T>> where T: 'static {
+    pub fn try_get<T>(&self) -> Result<Rc<T>, AssetError>
+    where
+        T: 'static,
+    {
         match self.value.clone().downcast::<T>() {
             Ok(val) => Ok(val),
-            Err(_) => Err(anyhow!(AssetError::InvalidType))
+            Err(_) => Err(AssetError::InvalidType),
         }
     }
     /// Tries to convert to a specified type, returning an owned value and consuming self in the process.
     /// If this function fails, the error value will contain self.
     /// This function removes assets from the heap and will fail if there are multiple extant references to that asset.
-    pub fn try_take<T>(self) -> Result<T, (AssetError, Self)> where T: 'static {
+    pub fn try_take<T>(self) -> Result<T, (AssetError, Self)>
+    where
+        T: 'static,
+    {
         match self.value.downcast::<T>() {
-            Ok(cast_value) =>  match Rc::try_unwrap(cast_value) {
+            Ok(cast_value) => match Rc::try_unwrap(cast_value) {
                 Ok(inner) => Ok(inner),
                 Err(value) => Err((AssetError::InvalidTake, Self { value })),
-            }
-            Err(value) => Err((AssetError::InvalidType, Self { value } )),
+            },
+            Err(value) => Err((AssetError::InvalidType, Self { value })),
         }
     }
 }
@@ -84,7 +99,10 @@ pub struct AssetMap {
 }
 impl AssetMap {
     /// Creates a new AssetMap from the specified type.
-    pub fn new<T>() -> Self where T: 'static {
+    pub fn new<T>() -> Self
+    where
+        T: 'static,
+    {
         Self {
             type_id: TypeId::of::<T>(),
             map: HashMap::new(),
@@ -98,46 +116,57 @@ impl AssetMap {
         }
     }
     /// Creates a new AssetMap, automatically inserting the asset.
-    pub fn from_asset<S, T>(name: S, asset: T) -> Self where S: Into<String>, T: 'static {
+    pub fn from_asset<S, T>(name: S, asset: T) -> Self
+    where
+        S: Into<String>,
+        T: 'static,
+    {
         Self {
             type_id: TypeId::of::<T>(),
             map: HashMap::from_iter([(name.into(), AssetStorage::new(asset))]),
         }
     }
     /// Creates a new AssetMap from a HashMap.
-    pub fn from_map<S, T>(map: HashMap<S, T>) -> Self where S:Into<String>, T: 'static {
-        let map = HashMap::from_iter(
-            map.into_iter()
-            .map(|(name, asset)| -> (String, AssetStorage) {
-                (name.into(), AssetStorage::new(asset))
-            })
-        );
+    pub fn from_map<S, T>(map: HashMap<S, T>) -> Self
+    where
+        S: Into<String>,
+        T: 'static,
+    {
+        let map = HashMap::from_iter(map.into_iter().map(
+            |(name, asset)| -> (String, AssetStorage) { (name.into(), AssetStorage::new(asset)) },
+        ));
 
         Self {
             type_id: TypeId::of::<T>(),
-            map
+            map,
         }
-    } 
+    }
 
     /// Tries to extend this map with another map. Fails if types do not match.
-    pub fn try_extend(&mut self, other: AssetMap) -> Result<&Self> {
+    pub fn try_extend(&mut self, other: AssetMap) -> Result<&Self, AssetError> {
         if other.type_id == self.type_id {
             self.map.extend(other.map);
             return Ok(self);
         }
-        return Err(anyhow!(AssetError::InvalidType))
+        return Err(AssetError::InvalidType);
     }
     /// Tries to insert an asset. Will return an error if the value is not of the appropriate type.
     /// Like HashMap::insert, this function will return a Some(T) if there is a value at that place.
     /// This function fails if an asset exists at the specified position and it cannot be converted to T.
-    pub fn try_insert<S, T>(&mut self, name: S, asset: T) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where S: Into<String>, T: 'static {
+    pub fn try_insert<S, T>(
+        &mut self,
+        name: S,
+        asset: T,
+    ) -> Result<Option<T>, (AssetError, Option<AssetStorage>)>
+    where
+        S: Into<String>,
+        T: 'static,
+    {
         if TypeId::of::<T>() == self.type_id {
             match self.map.insert(name.into(), AssetStorage::new(asset)) {
-                Some(asset_storage) => {
-                    match asset_storage.try_take() {
-                        Ok(val) => return Ok(Some(val)),
-                        Err((err, storage)) => return Err((err, Some(storage))),
-                    }
+                Some(asset_storage) => match asset_storage.try_take() {
+                    Ok(val) => return Ok(Some(val)),
+                    Err((err, storage)) => return Err((err, Some(storage))),
                 },
                 None => return Ok(None),
             }
@@ -145,14 +174,20 @@ impl AssetMap {
         return Err((AssetError::InvalidType, None));
     }
     /// Like [try_insert], but assumes the value is already on the heap.
-    pub fn try_insert_ref<S, T>(&mut self, name: S, asset: Rc<T>) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where S: Into<String>, T: 'static {
+    pub fn try_insert_ref<S, T>(
+        &mut self,
+        name: S,
+        asset: Rc<T>,
+    ) -> Result<Option<T>, (AssetError, Option<AssetStorage>)>
+    where
+        S: Into<String>,
+        T: 'static,
+    {
         if TypeId::of::<T>() == self.type_id {
             match self.map.insert(name.into(), AssetStorage::from_ref(asset)) {
-                Some(asset_storage) => {
-                    match asset_storage.try_take() {
-                        Ok(val) => return Ok(Some(val)),
-                        Err((err, storage)) => return Err((err, Some(storage))),
-                    }
+                Some(asset_storage) => match asset_storage.try_take() {
+                    Ok(val) => return Ok(Some(val)),
+                    Err((err, storage)) => return Err((err, Some(storage))),
                 },
                 None => return Ok(None),
             }
@@ -161,37 +196,44 @@ impl AssetMap {
     }
     /// Tries to get a reference to an asset.
     /// This function fails if it cannot find the asset with the given name, or if it cannot convert the asset to the specified type.
-    pub fn try_get<S, T>(&self, name: S) -> Result<Rc<T>> where S: Into<String>, T: 'static {
+    pub fn try_get<S, T>(&self, name: S) -> Result<Rc<T>, AssetError>
+    where
+        S: Into<String>,
+        T: 'static,
+    {
         let name = name.into();
         match self.map.get(&name) {
-            Some(storage) => {
-                storage.try_get()
-            }
-            None => Err(anyhow!(AssetError::AssetNotFound(name)))
+            Some(storage) => storage.try_get(),
+            None => Err(AssetError::AssetNotFound(name)),
         }
     }
     /// Tries to take an asset. If the asset is found, it is removed from the map.
     /// This function fails if it cannot find the asset with the given name, or if it cannot convert the asset to the specified type.
     /// This function removes assets from the heap and will fail if there are multiple extant references to that asset.
-    pub fn try_take<S, T>(&mut self, name: S) -> Result<T> where S: Into<String>, T: 'static {
+    pub fn try_take<S, T>(&mut self, name: S) -> Result<T, AssetError>
+    where
+        S: Into<String>,
+        T: 'static,
+    {
         let name = name.into();
         match self.map.remove(&name) {
-            Some(val) => {
-                match val.try_take() {
-                    Ok(val) => Ok(val),
-                    Err((err, storage)) => {
-                        self.map.insert(name, storage);
-                        Err(anyhow!(err))
-                    }
+            Some(val) => match val.try_take() {
+                Ok(val) => Ok(val),
+                Err((err, storage)) => {
+                    self.map.insert(name, storage);
+                    Err(err)
                 }
-            }
-            None => Err(anyhow!(AssetError::AssetNotFound(name)))
+            },
+            None => Err(AssetError::AssetNotFound(name)),
         }
     }
     /// Tries to convert to the specified type, consuming itself in the process.
     /// This function removes assets from the heap and will fail if there are multiple extant references to that asset.
     /// On failure, this function returns both the error type and the original [AssetMap].
-    pub fn try_into<T>(self) -> Result<HashMap<String, T>, (AssetError, Self)> where T: 'static {
+    pub fn try_into<T>(self) -> Result<HashMap<String, T>, (AssetError, Self)>
+    where
+        T: 'static,
+    {
         let mut res = HashMap::new();
         let mut errdata = None;
         for (name, storage) in self.map {
@@ -221,7 +263,10 @@ impl AssetMap {
         Ok(res)
     }
     /// Tries to convert to a hashmap containing references to values of the specified type.
-    pub fn try_as<T>(&self) -> Result<HashMap<String, Rc<T>>> where T: 'static {
+    pub fn try_as<T>(&self) -> Result<HashMap<String, Rc<T>>, AssetError>
+    where
+        T: 'static,
+    {
         let mut res = HashMap::new();
         for (name, storage) in &self.map {
             match storage.try_get::<T>() {
@@ -236,7 +281,10 @@ impl AssetMap {
 
     /// Returns a list of asset names.
     pub fn list_assets(&self) -> Vec<String> {
-        self.map.keys().map(|key| -> String {key.to_owned()}).collect()
+        self.map
+            .keys()
+            .map(|key| -> String { key.to_owned() })
+            .collect()
     }
 }
 
@@ -265,7 +313,7 @@ impl AssetMap {
 pub struct AssetTypeMap {
     // size_of::<TypeId> == 8 vs size_of::<String> == 24 vs size_of::<&str> == 16
     // Small memory redundancy for O(1) lookup time.
-    map: HashMap<TypeId, AssetMap>
+    map: HashMap<TypeId, AssetMap>,
 }
 impl AssetTypeMap {
     /// Creates an empty [AssetTypeMap].
@@ -274,17 +322,15 @@ impl AssetTypeMap {
             map: HashMap::new(),
         }
     }
-    
+
     /// Combines this asset typemap with another in-place.
-    pub fn try_combine(&mut self, other: AssetTypeMap) -> Result<&Self> {
+    pub fn try_combine(&mut self, other: AssetTypeMap) -> Result<&Self, AssetError> {
         for (asset_type, new_map) in other.map.into_iter() {
             match self.map.get_mut(&asset_type) {
-                Some(old_map) => {
-                    match old_map.try_extend(new_map) {
-                        Ok(_) => {},
-                        Err(e) => return Err(e),
-                    }
-                }
+                Some(old_map) => match old_map.try_extend(new_map) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                },
                 None => {
                     self.map.insert(asset_type, new_map);
                 }
@@ -297,12 +343,17 @@ impl AssetTypeMap {
     /// Following HashMap::insert, this function will return Some(T) if there was previously an asset in the specified slot, and None otherwise.
     /// This function fails if the specified asset_map exists, but its type does not match the asset passed in.
     /// This function fails if an asset exists at the specified position and it cannot be converted to T.
-    pub fn try_insert_asset<'a, T>(&mut self, name: &'a str, asset: T) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where T: 'static {
+    pub fn try_insert_asset<'a, T>(
+        &mut self,
+        name: &'a str,
+        asset: T,
+    ) -> Result<Option<T>, (AssetError, Option<AssetStorage>)>
+    where
+        T: 'static,
+    {
         let ty = TypeId::of::<T>();
         match self.map.get_mut(&ty) {
-            Some(map) => {
-                map.try_insert(name, asset)
-            }
+            Some(map) => map.try_insert(name, asset),
             None => {
                 self.map.insert(ty, AssetMap::from_asset(name, asset));
                 Ok(None)
@@ -311,97 +362,112 @@ impl AssetTypeMap {
     }
 
     /// Same as [try_insert_asset], but assumes the value is already on the heap.
-    pub fn try_insert_asset_ref<'a, T>(&mut self, name: &'a str, asset: Rc<T>) -> Result<Option<T>, (AssetError, Option<AssetStorage>)> where T: 'static {
+    pub fn try_insert_asset_ref<'a, T>(
+        &mut self,
+        name: &'a str,
+        asset: Rc<T>,
+    ) -> Result<Option<T>, (AssetError, Option<AssetStorage>)>
+    where
+        T: 'static,
+    {
         let ty = TypeId::of::<T>();
         match self.map.get_mut(&ty) {
-            Some(map) => {
-                map.try_insert_ref(name, asset)
-            }
+            Some(map) => map.try_insert_ref(name, asset),
             None => {
                 self.map.insert(ty, AssetMap::from_asset(name, asset));
                 Ok(None)
             }
         }
     }
-    
+
     /// Tries to get an asset reference. Will return an error if it cannot find the type or asset name, and if it cannot be converted to the specified type.
-    pub fn try_get_asset<'a, T>(&self, name: &'a str,) -> Result<Rc<T>> where T: 'static {
+    pub fn try_get_asset<'a, T>(&self, name: &'a str) -> Result<Rc<T>, AssetError>
+    where
+        T: 'static,
+    {
         let ty = TypeId::of::<T>();
         match self.map.get(&ty) {
-            Some(map) => {
-                map.try_get(name)
-            }
-            None => Err(anyhow!(AssetError::AssetMapNotFound))
+            Some(map) => map.try_get(name),
+            None => Err(AssetError::AssetMapNotFound),
         }
     }
-    
+
     /// Tries to take an asset as an owned value, removing it from the map in the process.
     /// This function removes assets from the heap and will fail if there are multiple extant references to that asset.
-    pub fn try_take_asset<'a, T>(&mut self, name: &'a str) -> Result<T> where T: 'static {
+    pub fn try_take_asset<'a, T>(&mut self, name: &'a str) -> Result<T, AssetError>
+    where
+        T: 'static,
+    {
         let ty = TypeId::of::<T>();
         match self.map.get_mut(&ty) {
-            Some(val) => {
-                val.try_take(name)
-            }
-            None => Err(anyhow!(AssetError::AssetMapNotFound))
+            Some(val) => val.try_take(name),
+            None => Err(AssetError::AssetMapNotFound),
         }
     }
 
     /// Directly inserts an [AssetMap].
-    pub fn insert_asset_map(&mut self, map: AssetMap) -> Option<AssetMap>{
+    pub fn insert_asset_map(&mut self, map: AssetMap) -> Option<AssetMap> {
         self.map.insert(map.type_id, map)
     }
-    
+
     /// Takes a HashMap of specific assets and inserts them into the table, converting them into the [Asset] storage type.
-    pub fn insert_map<S, T>(&mut self, map: HashMap<S, T>) -> Option<AssetMap> where S: Into<String>, T: 'static {
+    pub fn insert_map<S, T>(&mut self, map: HashMap<S, T>) -> Option<AssetMap>
+    where
+        S: Into<String>,
+        T: 'static,
+    {
         let mut asset_map = AssetMap::new::<T>();
         for (name, asset) in map {
-            asset_map.try_insert(name, asset).expect("If you're seeing this, something went wrong.");
+            asset_map
+                .try_insert(name, asset)
+                .expect("If you're seeing this, something went wrong.");
         }
         self.map.insert(TypeId::of::<T>(), asset_map)
     }
-    
+
     /// Tries to return a HashMap with type-converted asset references. Will return an error if it cannot find a map for the type, or if any member cannot be converted.
-    pub fn try_get_asset_map<T>(&self) -> Result<HashMap<String, Rc<T>>> where T: 'static {
+    pub fn try_get_asset_map<T>(&self) -> Result<HashMap<String, Rc<T>>, AssetError>
+    where
+        T: 'static,
+    {
         let ty = TypeId::of::<T>();
         match self.map.get(&ty) {
-            Some(map) => {
-                map.try_as()
-            }
-            None => Err(anyhow!(AssetError::AssetMapNotFound))
+            Some(map) => map.try_as(),
+            None => Err(AssetError::AssetMapNotFound),
         }
     }
-    
+
     /// Returns an owned, type-converted HashMap by removing it from the AssetTypeMap.
     /// This function fails if it cannot find a map for the type, or if any member cannot be converted.
     /// On failure, the AssetMap is not removed.
     /// This function removes assets from the heap and will fail if there are multiple extant references to that asset.
-    pub fn try_take_asset_map<T>(&mut self) -> Result<HashMap<String, T>> where T: 'static {
+    pub fn try_take_asset_map<T>(&mut self) -> Result<HashMap<String, T>, AssetError>
+    where
+        T: 'static,
+    {
         let ty = TypeId::of::<T>();
         match self.map.remove(&ty) {
-            Some(map) => {
-                match map.try_into() {
-                    Ok(val) => Ok(val),
-                    Err((err, map)) => {
-                        self.map.insert(ty, map);
-                        Err(anyhow!(err))
-                    }
+            Some(map) => match map.try_into() {
+                Ok(val) => Ok(val),
+                Err((err, map)) => {
+                    self.map.insert(ty, map);
+                    Err(err)
                 }
-            }
-            None => Err(anyhow!(AssetError::AssetMapNotFound))
+            },
+            None => Err(AssetError::AssetMapNotFound),
         }
     }
 
     /// Returns a list of asset names of the available type.
-    pub fn try_list_assets<T>(&mut self) -> Result<Vec<String>> where T: 'static {
+    pub fn try_list_assets<T>(&mut self) -> Result<Vec<String>, AssetError>
+    where
+        T: 'static,
+    {
         match self.map.get(&TypeId::of::<T>()) {
-            Some(map) => {
-                Ok(map.list_assets())
-            }
-            None => Err(anyhow!(AssetError::AssetMapNotFound))
+            Some(map) => Ok(map.list_assets()),
+            None => Err(AssetError::AssetMapNotFound),
         }
     }
-
 }
 
 // ---
@@ -413,14 +479,16 @@ pub type BincodeAssetMap = HashMap<String, Vec<u8>>;
 /// [AssetTypeMap] to be used with bytecode data. Automatically derives serialization.
 pub type BincodeAssetTypeMap = HashMap<String, BincodeAssetMap>;
 
-
 // ---
 // The below types deal with Assets as they are loaded from disk in the raw form.
 // ---
 
 /// Represents an [Asset] as loaded directly from disk.
 /// This is an intermediary form, which should be converted to Asset types and loaded into [AssetMap]s.
-pub trait RawAsset<AssetType> where AssetType : Any {
+pub trait RawAsset<AssetType>
+where
+    AssetType: Any,
+{
     /// Loads an individual asset from disk and stores it in this type.
     fn from_disk(path: &PathBuf) -> Self;
     /// Converts this type to the AssetType to be used with the engine.
@@ -447,8 +515,8 @@ pub type RawAssetMap<'a, AssetType> = HashMap<String, Box<dyn RawAsset<AssetType
 /// Builds assets from a RenderTarget.
 /// Only intended to last for the duration of a deserialization call.
 pub struct AssetBuildTarget<'a> {
-    pub device: &'a wgpu::Device,
-    pub queue: &'a wgpu::Queue,
+    pub device: &'a Device,
+    pub queue: &'a Queue,
     pub texture_layout: &'a wgpu::BindGroupLayout,
 }
 impl<'a> From<&'a HeadlessRenderTarget> for AssetBuildTarget<'a> {

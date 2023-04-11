@@ -1,0 +1,18 @@
+[package]
+name = "frontend"
+version = "0.1.0"
+edition = "2021"
+
+[[example]]
+name="basic"
+
+[dependencies]
+# local crates
+sundile = {path="../engine/"}
+
+# deps
+cgmath = "*"
+
+# workspace deps
+wgpu = {workspace = true}
+winit = {workspace = true}

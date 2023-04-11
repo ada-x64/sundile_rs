@@ -1,2 +1,6 @@
+*
+!*/
+!*.rs
+!*Cargo*
 target/
-Cargo.lock
+dbg/

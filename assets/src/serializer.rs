@@ -1,9 +1,7 @@
-
-use sundile_common::*;
-use std::collections::HashMap;
-use std::path::*;
 use crate::*;
 use log::info;
+use std::collections::HashMap;
+use std::path::*;
 
 /// Loads asset data into a binary. Intended to be used in build scripts to statically load assets.
 pub struct Serializer<'a> {
@@ -21,19 +19,29 @@ impl<'a> Serializer<'a> {
         }
     }
     /// Adds an asset map to be serialized.
-    pub fn with_mapper<S>(mut self, asset_type_name: S, mapper: impl RawAssetMapper + 'a) -> Self where S: Into<String> {
-        self.mappers.insert(asset_type_name.into(), Box::new(mapper));
+    pub fn with_mapper<S>(mut self, asset_type_name: S, mapper: impl RawAssetMapper + 'a) -> Self
+    where
+        S: Into<String>,
+    {
+        self.mappers
+            .insert(asset_type_name.into(), Box::new(mapper));
         self
     }
     /// Sets the output directory. Data will be serialized to out_dir/data.bin.
     /// The default out_path is "./".
-    pub fn with_out_path<P>(mut self, path: P) -> Self where P : Into<PathBuf> {
+    pub fn with_out_path<P>(mut self, path: P) -> Self
+    where
+        P: Into<PathBuf>,
+    {
         self.out_path = Some(path.into());
         self
     }
     /// Sets the asset directory. The asset compiler should then load data from asset_directory/(asset_type)/*.type_extension
     /// The default in path is "./assets/"
-    pub fn with_asset_directory<P>(mut self, path: P) -> Self where P : Into<PathBuf> {
+    pub fn with_asset_directory<P>(mut self, path: P) -> Self
+    where
+        P: Into<PathBuf>,
+    {
         self.asset_directory = Some(path.into());
         self
     }
@@ -42,12 +50,9 @@ impl<'a> Serializer<'a> {
     pub fn serialize(self) -> Vec<u8> {
         info!("Serializing assets...");
 
-        let out_path = self.out_path
-            .unwrap_or("./".into())
-            .join("data.bin");
+        let out_path = self.out_path.unwrap_or("./".into()).join("data.bin");
 
-        let in_path = self.asset_directory
-            .unwrap_or("./assets/".into());
+        let in_path = self.asset_directory.unwrap_or("./assets/".into());
 
         let mut out_map = BincodeAssetTypeMap::new();
         for (name, mut mapper) in self.mappers {
@@ -58,8 +63,10 @@ impl<'a> Serializer<'a> {
         let bin = bincode::serialize(&out_map).expect("Unable to serialize RawAssetTypeMap");
 
         use std::io::Write;
-        std::fs::File::create(out_path).expect("Unable to create file at out_path")
-            .write(&bin[..]).expect("Unable to write to bin");
+        std::fs::File::create(out_path)
+            .expect("Unable to create file at out_path")
+            .write(&bin[..])
+            .expect("Unable to write to bin");
 
         info!("...Done!");
         bin
@@ -73,7 +80,7 @@ impl<'a> Default for Serializer<'a> {
             .with_mapper("models", types::models::Mapper::new())
             .with_mapper("textures", types::textures::Mapper::new())
             .with_mapper("fonts", types::fonts::Mapper::new())
-            //etc
+        //etc
     }
 }
 
@@ -91,8 +98,12 @@ impl<'a> Deserializer<'a> {
         }
     }
     /// Adds an asset map to be deserialized.
-    pub fn with_mapper<S>(mut self, asset_type_name: S, mapper: impl RawAssetMapper + 'a) -> Self where S: Into<String> {
-        self.mappers.insert(asset_type_name.into(), Box::new(mapper));
+    pub fn with_mapper<S>(mut self, asset_type_name: S, mapper: impl RawAssetMapper + 'a) -> Self
+    where
+        S: Into<String>,
+    {
+        self.mappers
+            .insert(asset_type_name.into(), Box::new(mapper));
         self
     }
     /// Determines if [Deserializer::deserialize] will panic if it cannot convert all available data.
@@ -101,17 +112,24 @@ impl<'a> Deserializer<'a> {
         self
     }
     /// Parses the bin. May panic if it cannot parse the binary into an AssetTypeMap or if no mapper exists for an asset type within that binary.
-    pub fn deserialize<'f, BuilderType>(self, bin: &[u8], asset_builder: &'f BuilderType) -> AssetTypeMap
-    where &'f BuilderType: Into<AssetBuildTarget<'f>> {
+    pub fn deserialize<'f, BuilderType>(
+        self,
+        bin: &[u8],
+        asset_builder: &'f BuilderType,
+    ) -> AssetTypeMap
+    where
+        &'f BuilderType: Into<AssetBuildTarget<'f>>,
+    {
         info!("Deserializing assets...");
         let builder = asset_builder.into();
-        let mut map_in = bincode::deserialize::<BincodeAssetTypeMap>(bin).expect("Unable to read bin!");
+        let mut map_in =
+            bincode::deserialize::<BincodeAssetTypeMap>(bin).expect("Unable to read bin!");
         let mut map_out = AssetTypeMap::new();
 
         for (name, mut mapper) in self.mappers {
             let bin_map = match map_in.remove(&name) {
                 Some(bin_map) => bin_map,
-                None => continue
+                None => continue,
             };
             mapper.load_bin_map(bin_map);
             map_out.insert_asset_map(mapper.to_asset_map(&builder));
@@ -133,6 +151,7 @@ impl<'a> Default for Deserializer<'a> {
             .with_mapper("models", types::models::Mapper::new())
             .with_mapper("textures", types::textures::Mapper::new())
             .with_mapper("fonts", types::fonts::Mapper::new())
-            //etc
+        //etc
     }
 }
+
