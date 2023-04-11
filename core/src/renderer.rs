@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use sundile_assets::*;
 use sundile_common::*;
 use sundile_graphics::*;
@@ -23,9 +25,8 @@ impl Renderer {
         let (device, config) = (&render_target.device, &render_target.config);
 
         let (width, height) = {
-            if viewport.is_some() {
-                let vp = viewport.as_ref().unwrap();
-                (vp.width as u32, vp.height as u32)
+            if let Some(viewport) = viewport {
+                (viewport.width as u32, viewport.height as u32)
             } else {
                 (config.width as u32, config.height as u32)
             }
@@ -115,10 +116,9 @@ impl Renderer {
         }
     }
 
-    pub fn update(&mut self, dt: sundile_common::time::Time) {
+    pub fn update(&mut self, dt: sundile_common::time::Duration) {
         self.camera_wrapper.update(dt);
 
-        // TODO: Lights aren't working. Ambient is fine.
         use cgmath::*;
         let mut light = self.light_wrapper.get_light("test").unwrap();
         light.position = [
@@ -133,7 +133,7 @@ impl Renderer {
         self.camera_wrapper.handle_input(input);
     }
 
-    pub fn render(&mut self, render_target: &mut RenderTarget, assets: &mut AssetTypeMap) {
+    pub fn render(&mut self, render_target: &mut RenderTarget, assets: Arc<Mutex<AssetTypeMap>>) {
         //
         // Setup
         //
@@ -141,6 +141,7 @@ impl Renderer {
         let light_bind_group = self.light_wrapper.get_bind_group(&render_target.device);
         let camera_bind_group = &self.camera_wrapper.bind_group;
 
+        let mut assets = assets.lock().unwrap();
         let mut model_map = assets.try_take_asset_map::<Model>().ok();
         if let Some(mm) = model_map.as_mut() {
             for (_, model) in mm {

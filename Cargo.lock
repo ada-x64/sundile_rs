@@ -798,6 +798,7 @@ dependencies = [
 name = "frontend"
 version = "0.1.0"
 dependencies = [
+ "cgmath",
  "sundile",
  "wgpu",
  "winit",

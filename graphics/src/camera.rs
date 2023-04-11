@@ -1,6 +1,6 @@
 use cgmath::*;
 use std::f32::consts::FRAC_PI_2;
-use sundile_common::{input::Input, time::Time};
+use sundile_common::{input::Input, time::Duration};
 use wgpu::util::DeviceExt;
 use winit::event::*;
 
@@ -128,7 +128,7 @@ impl CameraController {
         }
     }
 
-    pub fn update(&mut self, cam: &mut Camera, dt: Time) {
+    pub fn update(&mut self, cam: &mut Camera, dt: Duration) {
         let dt = dt.as_secs() as f32; //this for legacy reasons
 
         // vel
@@ -221,7 +221,7 @@ impl CameraWrapper {
         }
     }
 
-    pub fn update(&mut self, dt: Time) {
+    pub fn update(&mut self, dt: Duration) {
         self.controller.update(&mut self.camera, dt);
         self.uniform
             .update_view_proj(&self.camera, &self.projection);
@@ -235,4 +235,3 @@ impl CameraWrapper {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 }
-

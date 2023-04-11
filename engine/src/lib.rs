@@ -17,6 +17,7 @@ pub mod prelude {
     pub use crate::builders::*;
     pub use sundile_common::*;
 }
+
 use egui_winit::winit::event::VirtualKeyCode;
 use log::*;
 pub use prelude::*;
@@ -50,38 +51,49 @@ impl Engine {
         let mut game = Game::new(&render_target, assets, scene_map, None, debug_gui.open);
         let mut fps = 0.0;
         let mut timer = time::Timer::new();
+        let mut debug_timer = time::Timer::new();
+        let one_second = time::Duration::from_secs(1.);
+        debug_timer.start();
         let mut input = Input::new();
 
         event_loop.run(
             move |event, _, control_flow| match debug_gui.handle_event(event) {
                 Some(event) => {
-                    if input.update(&event) {
-                        if input.key_pressed(VirtualKeyCode::F5) {
-                            debug_gui.open = !debug_gui.open;
-                            game.paused = debug_gui.open;
-                        }
-                        if input.key_pressed(VirtualKeyCode::Escape) {
-                            *control_flow = winit::event_loop::ControlFlow::Exit;
-                            warn!("Exiting");
-                        }
-                        game.handle_input(&input);
-
-                        let dt = timer.elapsed();
-                        timer.start();
-
-                        let smoothing = 0.9;
-                        if dt.as_secs() != 0.0 {
-                            fps = fps * smoothing + (1.0 - smoothing) / (dt.as_secs());
-                        }
-                        game.update(dt);
-
-                        render_target.begin_frame();
-                        game.render(&mut render_target);
-                        debug_gui.render(&mut render_target, &window, &mut game, fps);
-                        render_target.end_frame();
-
-                        input.step();
+                    let can_update_game = input.update(&event);
+                    if !can_update_game {
+                        return;
                     }
+
+                    if input.key_pressed(VirtualKeyCode::F5) {
+                        debug_gui.open = !debug_gui.open;
+                        game.paused = debug_gui.open;
+                    }
+                    if input.key_pressed(VirtualKeyCode::Escape) {
+                        *control_flow = winit::event_loop::ControlFlow::Exit;
+                        warn!("Exiting");
+                    }
+
+                    game.handle_input(&input);
+
+                    let dt = timer.elapsed();
+                    timer.start();
+
+                    let smoothing = 0.9;
+                    if dt.as_secs() != 0.0 {
+                        fps = fps * smoothing + (1.0 - smoothing) / (dt.as_secs());
+                    }
+                    game.update(dt);
+
+                    if debug_timer.elapsed() > one_second {
+                        info!("fps: {fps}");
+                    }
+
+                    render_target.begin_frame();
+                    game.render(&mut render_target);
+                    debug_gui.render(&mut render_target, &window, &mut game, fps);
+                    render_target.end_frame();
+
+                    input.step();
                 }
                 None => {}
             },

@@ -1,20 +1,35 @@
+use std::f32::consts::PI;
+
+use cgmath::{Euler, Rad, Vector3};
 use sundile::{
-    AssetTypeMapBuilder, Deserializer, ModelInstance, SceneBuilder, SceneMapBuilder, WindowBuilder,
+    AssetTypeMapBuilder, Deserializer, EngineBuilder, ModelInstance, SceneBuilder, SceneMapBuilder,
+    WindowBuilder,
 };
 
 fn default_scene(b: SceneBuilder) {
-    b.new_model_instance("test_cube", ModelInstance::at_origin())
+    for i in 0..10 {
+        for j in 0..10 {
+            let x = i as f32;
+            let z = j as f32;
+            b.new_model_instance(
+                "cube",
+                ModelInstance::new(
+                    Vector3::new(x * 5., 0.0, z * 5.),
+                    Euler::new(Rad(z * 5. * PI / 10.0), Rad(x * 2. * PI / 10.), Rad(0.0)).into(),
+                ),
+            )
+        }
+    }
 }
 
 fn main() {
-    let engine = sundile::EngineBuilder::new()
+    EngineBuilder::new()
         .with_window(WindowBuilder::new().with_title("Sundile"))
         .with_assets(
             AssetTypeMapBuilder::new()
                 .with_deserializer(Deserializer::default(), include_bytes!("data.bin")),
         )
         .with_scenes(SceneMapBuilder::new().with_scene("default", default_scene))
-        .build();
-
-    engine.run();
+        .build()
+        .run();
 }

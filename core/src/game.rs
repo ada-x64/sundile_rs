@@ -1,3 +1,7 @@
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::time::Duration;
+
 use sundile_assets::*;
 use sundile_common::*;
 use sundile_graphics::*;
@@ -14,9 +18,11 @@ pub struct Game {
     pub renderer: Renderer,
     pub renderer2d: Renderer2d,
     pub paused: bool,
-    pub assets: AssetTypeMap,
+    pub assets: Arc<Mutex<AssetTypeMap>>,
     scenes: SceneMap, //TODO: Possibly move this outside of Game struct so DebugGui has ability to change scenes?
     scene_initialized: bool,
+
+    frame_time: Duration,
 }
 
 impl Game {
@@ -36,17 +42,19 @@ impl Game {
             renderer,
             renderer2d,
             paused,
-            assets,
+            assets: Arc::new(Mutex::new(assets)),
             scenes,
             scene_initialized: false,
         }
     }
 
-    pub fn update(&mut self, dt: time::Time) {
+    pub fn update(&mut self, dt: time::Duration) {
+        // TODO: This should be something like Scene.init()
         if !self.scene_initialized {
             self.scenes
                 .get("default")
-                .unwrap_or(&(default_scene as SceneFn))(Self::get_scene_builder());
+                .unwrap_or(&(default_scene as SceneFn))(self.get_scene_builder());
+            self.scene_initialized = true;
         }
         if self.paused {
             return;
@@ -58,7 +66,7 @@ impl Game {
         if self.paused {
             return;
         }
-        self.renderer.render(render_target, &mut self.assets);
+        self.renderer.render(render_target, self.assets.clone());
         self.renderer2d.render(render_target);
     }
 
@@ -71,10 +79,10 @@ impl Game {
 
     //TODO: Scenes should be assets loaded with AssetManager struct.
     pub fn set_scene<'s>(&mut self, scene: &'s str) {
-        self.scenes[scene](Self::get_scene_builder());
+        self.scenes[scene](self.get_scene_builder());
     }
 
-    pub fn get_scene_builder() -> SceneBuilder {
-        SceneBuilder::new(todo!())
+    pub fn get_scene_builder(&self) -> SceneBuilder {
+        SceneBuilder::new(self.assets.clone())
     }
 }

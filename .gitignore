@@ -1,3 +1,10 @@
+*
+!assets/
+!common/
+!core/
+!engine/
+!examples/
+!graphics/
 target/
 dbg/
 data.bin

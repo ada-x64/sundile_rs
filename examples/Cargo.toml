@@ -10,6 +10,9 @@ name="basic"
 # local crates
 sundile = {path="../engine/"}
 
+# deps
+cgmath = "*"
+
 # workspace deps
 wgpu = {workspace = true}
 winit = {workspace = true}
