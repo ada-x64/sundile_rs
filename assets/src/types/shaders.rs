@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
-use sundile_common::*;
-use std::path::*;
+use std::collections::HashMap;
 use std::fs::*;
 use std::io::Read;
+use std::path::*;
 
 use crate::*;
 
@@ -18,29 +17,35 @@ impl RawAsset<wgpu::ShaderModule> for ShaderData {
     fn from_disk(path: &PathBuf) -> Self {
         match std::process::Command::new("naga")
             .arg(path.as_os_str())
-            .spawn() {
-                Ok(mut c) => {c.wait().ok();},
-                Err(e) => {
-                    use log::warn;
-                    warn!("Could not validate shader using naga-cli.\n{}", e);
-                    println!("cargo:warn=Could not validate shader using naga-cli.\n{}", e);
-                }
+            .spawn()
+        {
+            Ok(mut c) => {
+                c.wait().ok();
             }
+            Err(e) => {
+                use log::warn;
+                warn!("Could not validate shader using naga-cli.\n{}", e);
+                println!(
+                    "cargo:warn=Could not validate shader using naga-cli.\n{}",
+                    e
+                );
+            }
+        }
 
         let mut buffer = String::new();
         let mut file = File::open(path).unwrap();
         file.read_to_string(&mut buffer).unwrap();
-        Self {
-            data: buffer
-        }
+        Self { data: buffer }
     }
 
     /// Converts the SPIR-V binary to a shader module.
     fn to_asset(self, asset_builder: &AssetBuildTarget) -> wgpu::ShaderModule {
-        asset_builder.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(self.data.into()),
-        })
+        asset_builder
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(self.data.into()),
+            })
     }
 }
 

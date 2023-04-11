@@ -1,15 +1,16 @@
-pub use sundile_common::*;
-pub use sundile_scripting::*;
-pub use sundile_graphics::*;
-pub use sundile_assets::*;
 pub use crate::debug_gui::*;
 pub use crate::Engine;
-pub use winit::{window::WindowBuilder, event_loop::EventLoop};
-use std::collections::HashMap;
 pub use log;
 use log::debug;
+use std::collections::HashMap;
+pub use sundile_assets::*;
+pub use sundile_common::*;
+use sundile_core::SceneFn;
+use sundile_core::SceneMap;
+pub use sundile_graphics::*;
+pub use winit::{event_loop::EventLoop, window::WindowBuilder};
 
-/// Builder for the game engine. 
+/// Builder for the game engine.
 pub struct EngineBuilder<'a> {
     window_builder: Option<WindowBuilder>,
     render_target_builder: Option<RenderTargetBuilder<'a>>,
@@ -62,12 +63,20 @@ impl<'a> EngineBuilder<'a> {
     }
     /// Adds a [SceneMapBuilder], which will add scenes at build time.
     pub fn with_scenes(mut self, scene_map_builder: SceneMapBuilder) -> Self {
-        self.scene_map_builder = Some(self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).combine(scene_map_builder));
+        self.scene_map_builder = Some(
+            self.scene_map_builder
+                .unwrap_or(SceneMapBuilder::new())
+                .combine(scene_map_builder),
+        );
         self
     }
     /// Adds a debug_gui interface. Tip: Use DebugGuiBuilder.
     pub fn with_debug_gui(mut self, debug_gui_builder: DebugGuiBuilder<'a>) -> Self {
-        self.debug_gui_builder = Some(self.debug_gui_builder.unwrap_or(DebugGuiBuilder::new()).combine(debug_gui_builder));
+        self.debug_gui_builder = Some(
+            self.debug_gui_builder
+                .unwrap_or(DebugGuiBuilder::new())
+                .combine(debug_gui_builder),
+        );
         self
     }
     /// Adds an asset builder, which will run its build function on [EngineBuilder::build]
@@ -79,8 +88,12 @@ impl<'a> EngineBuilder<'a> {
     pub fn build(self) -> Engine {
         debug!("Building engine...");
         let event_loop = EventLoop::new();
-        let window = self.window_builder.unwrap_or(WindowBuilder::new()).build(&event_loop).expect("Unable to build window!");
-        #[cfg(target_arch="wasm32")]
+        let window = self
+            .window_builder
+            .unwrap_or(WindowBuilder::new())
+            .build(&event_loop)
+            .expect("Unable to build window!");
+        #[cfg(target_arch = "wasm32")]
         {
             // Append the canvas to the document body.
             use winit::platform::web::WindowExtWebSys;
@@ -91,10 +104,22 @@ impl<'a> EngineBuilder<'a> {
             debug!("Canvas created.");
         }
 
-        let render_target = self.render_target_builder.unwrap_or(RenderTargetBuilder::new(None, false)).build(&window);
-        let mut assets = self.asset_typemap_builder.unwrap_or(AssetTypeMapBuilder::new()).build(&render_target);
-        let debug_gui = self.debug_gui_builder.unwrap_or(DebugGuiBuilder::new()).build(&render_target, &window);
-        let scene_map = self.scene_map_builder.unwrap_or(SceneMapBuilder::new()).build();
+        let render_target = self
+            .render_target_builder
+            .unwrap_or(RenderTargetBuilder::new(None, false))
+            .build(&window);
+        let mut assets = self
+            .asset_typemap_builder
+            .unwrap_or(AssetTypeMapBuilder::new())
+            .build(&render_target);
+        let debug_gui = self
+            .debug_gui_builder
+            .unwrap_or(DebugGuiBuilder::new())
+            .build(&render_target, &event_loop);
+        let scene_map = self
+            .scene_map_builder
+            .unwrap_or(SceneMapBuilder::new())
+            .build();
 
         for asset_builder in self.asset_builders {
             debug!("Building Ext Asset");
@@ -144,17 +169,25 @@ impl<'a> DebugGuiBuilder<'a> {
         self
     }
     /// Builds the debug gui. Should only be used internally.
-    pub(crate) fn build(self, render_target: &RenderTarget, window: &winit::window::Window,) -> DebugGui {
+    pub(crate) fn build<T>(
+        self,
+        render_target: &RenderTarget,
+        event_loop: &winit::event_loop::EventLoopWindowTarget<T>,
+    ) -> DebugGui {
         debug!("Building DebugGui");
-        let debug_windows = HashMap::from_iter(self.debug_windows.into_iter().map(|(key, value)| (key.to_string(), value)));
-        DebugGui::new(render_target, window, debug_windows, self.open)
+        let debug_windows = HashMap::from_iter(
+            self.debug_windows
+                .into_iter()
+                .map(|(key, value)| (key.to_string(), value)),
+        );
+        DebugGui::new(render_target, event_loop, debug_windows, self.open)
     }
 }
 
 /// Creates SceneMaps. To be passed in to EngineBuilder.
 pub struct SceneMapBuilder {
     map: SceneMap,
-} 
+}
 impl SceneMapBuilder {
     /// Creates a new SceneMapBuilder with default settings.
     pub fn new() -> Self {
@@ -186,7 +219,7 @@ pub type Deserializer<'a> = sundile_assets::Deserializer<'a>;
 pub struct AssetTypeMapBuilder<'a> {
     map: AssetTypeMap,
     deserializer: Option<Deserializer<'a>>,
-    bin: Option<&'a [u8]>
+    bin: Option<&'a [u8]>,
 }
 impl<'a> AssetTypeMapBuilder<'a> {
     /// Creates a new AssetTypeMapBuilder with default options.
@@ -198,13 +231,16 @@ impl<'a> AssetTypeMapBuilder<'a> {
         }
     }
     /// Adds an asset. Will create a category for the associated type if needed.
-    pub fn with_asset<T>(mut self, name: &'a str, asset: T) -> Self where T: 'static {
+    pub fn with_asset<T>(mut self, name: &'a str, asset: T) -> Self
+    where
+        T: 'static,
+    {
         self.map.try_insert_asset(name, asset).unwrap();
         self
     }
-    
+
     /// Adds a [Deserializer] and the data to be deserialized. (Tip: use [include_bytes!])
-    pub fn with_deserializer(mut self, deserializer: Deserializer<'a>, bin: &'a[u8]) -> Self {
+    pub fn with_deserializer(mut self, deserializer: Deserializer<'a>, bin: &'a [u8]) -> Self {
         self.deserializer = Some(deserializer);
         self.bin = Some(bin);
         self
@@ -214,12 +250,12 @@ impl<'a> AssetTypeMapBuilder<'a> {
         debug!("Building AssetMap");
         match self.deserializer {
             Some(de) => {
-                self.map.try_combine(de.deserialize(self.bin.unwrap(), render_target)).unwrap();
+                self.map
+                    .try_combine(de.deserialize(self.bin.unwrap(), render_target))
+                    .unwrap();
                 self.map
             }
-            None => {
-                self.map
-            }
+            None => self.map,
         }
     }
 }
@@ -238,13 +274,11 @@ impl<'a> RenderTargetBuilder<'a> {
     pub fn new(label: Option<&'a str>, enable_tracing: bool) -> Self {
         Self {
             label,
-            enable_tracing
+            enable_tracing,
         }
     }
     pub(crate) fn build(self, window: &winit::window::Window) -> RenderTarget {
         debug!("Building RenderTarget");
-        futures::executor::block_on(
-            RenderTarget::new(window, self.enable_tracing, self.label)
-        )
+        futures::executor::block_on(RenderTarget::new(window, self.enable_tracing, self.label))
     }
 }

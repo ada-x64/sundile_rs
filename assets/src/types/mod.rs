@@ -1,9 +1,11 @@
 // pub mod audio;
-#[cfg(feature="fonts")]
+#[cfg(feature = "fonts")]
 pub mod fonts;
-#[cfg(feature="models")]
+#[cfg(feature = "models")]
 pub mod models;
-#[cfg(feature="shaders")]
+#[cfg(feature = "shaders")]
 pub mod shaders;
-#[cfg(feature="textures")]
+#[cfg(feature = "text")]
+pub mod text;
+#[cfg(feature = "textures")]
 pub mod textures;

@@ -1,25 +1,17 @@
-use sundile_common::*;
-
 pub mod camera;
-pub mod texture;
-pub mod model;
 pub mod light;
+pub mod model;
 pub mod render_target;
 pub mod text;
+pub mod texture;
 pub mod texture_atlas;
 
 pub mod prelude {
     pub use crate::{
-        *,
-        camera::*,
-        texture::*,
-        model::*,
-        light::*,
-        render_target::*,
-        text::*,
-        texture_atlas::*,
+        camera::*, light::*, model::*, render_target::*, text::*, texture::*, texture_atlas::*, *,
     };
     pub use image;
+    pub use wgpu_glyph;
 }
 pub use prelude::*;
 
@@ -33,9 +25,9 @@ pub trait Vertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vert2d {
-    pub position: [f32;3],
-    pub color: [f32;4],
-    pub texcoords: [f32;2],
+    pub position: [f32; 3],
+    pub color: [f32; 4],
+    pub texcoords: [f32; 2],
 }
 
 impl Vertex for Vert2d {
@@ -59,7 +51,7 @@ impl Vertex for Vert2d {
                     offset: std::mem::size_of::<[f32; 7]>() as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32x2,
-                }
+                },
             ],
         }
     }
@@ -74,12 +66,12 @@ pub struct Color {
 }
 impl Color {
     pub fn from_rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self{ r, g, b, a}
+        Self { r, g, b, a }
     }
     pub fn from_rgb(r: f32, g: f32, b: f32) -> Self {
-        Color::from_rgba(r,g,b,1.0)
+        Color::from_rgba(r, g, b, 1.0)
     }
-    pub fn as_array(&self) -> [f32;4] {
+    pub fn as_array(&self) -> [f32; 4] {
         [self.r, self.g, self.b, self.a]
     }
 }
@@ -91,7 +83,7 @@ pub struct Position {
     z: f32,
 }
 impl Position {
-    pub fn as_array(&self) -> [f32;3] {
+    pub fn as_array(&self) -> [f32; 3] {
         [self.x, self.y, self.z]
     }
 }
@@ -108,7 +100,7 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    pub fn new(x:f32, y:f32, width:f32, height:f32) -> Self {
+    pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
         Viewport {
             x,
             y,
@@ -124,13 +116,16 @@ impl Viewport {
  * Tests
  ************************************************/
 
-#[cfg(target_arch="windows")]
+#[cfg(target_arch = "windows")]
 #[test]
 fn test_empty_frame() {
     use winit::platform::windows::EventLoopExtWindows;
     let event_loop = winit::event_loop::EventLoop::<u8>::new_any_thread();
-    let window = winit::window::WindowBuilder::new().build(&event_loop).unwrap();
-    let mut render_target = futures::executor::block_on(render_target::RenderTarget::new(&window, false, None));
+    let window = winit::window::WindowBuilder::new()
+        .build(&event_loop)
+        .unwrap();
+    let mut render_target =
+        futures::executor::block_on(render_target::RenderTarget::new(&window, false, None));
     render_target.begin_frame();
     render_target.end_frame();
 }

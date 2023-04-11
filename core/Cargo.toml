@@ -10,10 +10,14 @@ edition = "2021"
 # rendering 
 bytemuck = {version = "1.9", features = [ "derive" ]}
 cgmath = "0.18"
-wgpu_glyph = "0.16.0"
+wgpu_glyph = "*"
 
 # internal
 sundile_common = { path = "../common" }
 sundile_graphics = {path = "../graphics/"}
 sundile_assets = { path = "../assets/" }
-sundile_scripting = { path = "../scripting/" }
+
+# workspace
+wgpu = {workspace = true}
+winit = {workspace = true}
+log = {workspace = true}
