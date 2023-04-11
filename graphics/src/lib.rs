@@ -11,6 +11,7 @@ pub mod prelude {
         camera::*, light::*, model::*, render_target::*, text::*, texture::*, texture_atlas::*, *,
     };
     pub use image;
+    pub use wgpu_glyph;
 }
 pub use prelude::*;
 

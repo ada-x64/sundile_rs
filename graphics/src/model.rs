@@ -427,6 +427,8 @@ impl Vertex for InstanceRaw {
 }
 
 /// An InstanceCache holds all the instancing information for a particular model.
+/// TODO: Generalize. Create an InstanceCache that can handle any type.
+/// Create an Instantiable trait for anything that can be pushed into a cache.
 #[derive(Debug)]
 pub struct InstanceCache {
     instances: Vec<ModelInstance>,

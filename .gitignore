@@ -1,10 +1,6 @@
 *
-!assets/
-!common/
-!core/
-!engine/
-!examples/
-!graphics/
+!*/
+!*.rs
+!*Cargo*
 target/
 dbg/
-data.bin

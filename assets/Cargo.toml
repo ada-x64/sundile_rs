@@ -21,8 +21,9 @@ tobj = { version = "3.2", optional = true }
 cgmath = { version = "0.18", optional = true }
 
 [features]
-default = ["models", "shaders", "fonts", "textures"]
+default = ["models", "shaders", "fonts", "textures", "text"]
 models = ["tobj", "cgmath"]
 shaders = []
 fonts = []
 textures = []
+text = []

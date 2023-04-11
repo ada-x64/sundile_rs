@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
 
 use sundile_assets::*;
 use sundile_common::*;
@@ -21,8 +20,6 @@ pub struct Game {
     pub assets: Arc<Mutex<AssetTypeMap>>,
     scenes: SceneMap, //TODO: Possibly move this outside of Game struct so DebugGui has ability to change scenes?
     scene_initialized: bool,
-
-    frame_time: Duration,
 }
 
 impl Game {
@@ -67,7 +64,7 @@ impl Game {
             return;
         }
         self.renderer.render(render_target, self.assets.clone());
-        self.renderer2d.render(render_target);
+        self.renderer2d.render(render_target, self.assets.clone());
     }
 
     pub fn handle_input(&mut self, input: &Input) {

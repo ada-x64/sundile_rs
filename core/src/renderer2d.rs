@@ -8,27 +8,43 @@
 // Draw textured quad
 // Draw text
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use sundile_assets::AssetTypeMap;
 use sundile_graphics::{
-    Color, Font, RenderTarget, Sprite, TextWrapper, TextureAtlas, Vert2d, Vertex,
+    Color, Font, FontSpecifier, GlyphRenderer, RenderTarget, Sprite, TextBlock, TextureAtlas,
+    Vert2d, Vertex,
 };
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
-use wgpu_glyph::{FontId, Section, Text};
+use wgpu_glyph::{
+    BuiltInLineBreaker, FontId, HorizontalAlign, Layout, Section, Text, VerticalAlign,
+};
 
 struct Quad {
     sprite: Option<&'static str>,
     vertices: [f32; 4],
-    color: sundile_graphics::Color,
+    color: Color,
 }
 
+const DEFAULT_LAYOUT: Layout<BuiltInLineBreaker> = Layout::SingleLine {
+    line_breaker: BuiltInLineBreaker::UnicodeLineBreaker,
+    h_align: HorizontalAlign::Left,
+    v_align: VerticalAlign::Bottom,
+};
+const DEFAULT_FONT: FontId = FontId(0);
+
+/// This struct is a wrapper for wgpu_glyph's Section class.
+/// It contains all the parameters needed to create the section,
+/// which will be instantiated when needed.
+/// This avoids lifetime shenanegins.
 struct SectionBuilder {
     text: String,
     pos: (f32, f32),
     bounds: (f32, f32),
     color: Color,
     font_size: f32,
-    current_font: Option<FontId>,
+    current_font: FontId,
+    layout: Layout<BuiltInLineBreaker>,
 }
 impl SectionBuilder {
     /// Build the Section.
@@ -40,24 +56,30 @@ impl SectionBuilder {
             text: vec![Text::new(self.text.as_str())
                 .with_color(self.color.as_array())
                 .with_scale(self.font_size)
-                .with_font_id(self.current_font.unwrap_or(FontId(0)))],
+                .with_font_id(self.current_font)],
+            layout: self.layout,
             ..Section::default()
         }
     }
 }
 
+/// The 2D Renderer is designed for GUI elements. Anything that will be drawn
+/// directly to the screen. Useful for HUDs and debug info.
+/// TODO: This seems unnecessary. Just create a quad that is always drawn
+/// right next to the camera.
 pub struct Renderer2d {
     texture_atlas: TextureAtlas,
     queue: Vec<Quad>,
     pipeline: wgpu::RenderPipeline,
-    color: sundile_graphics::Color,
+    color: Color,
     screen_size: [u32; 2],
 
-    text_wrapper: TextWrapper,
+    text_wrapper: GlyphRenderer,
     text_queue: Vec<SectionBuilder>,
     text_bounds: (f32, f32),
     font_size: f32,
     current_font: Option<FontId>,
+    current_layout: Option<Layout<BuiltInLineBreaker>>,
 }
 
 #[allow(dead_code)]
@@ -131,7 +153,7 @@ impl Renderer2d {
         });
 
         let text_wrapper =
-            TextWrapper::new(&render_target, assets.try_take_asset_map::<Font>().ok());
+            GlyphRenderer::new(&render_target, assets.try_take_asset_map::<Font>().ok());
 
         // let texture_atlas = TextureAtlasBuilder::new()
         //     .with_sprite_sheet("atlas_0", assets.get_asset("textures", "atlas_0"), SpriteSheet::new(16,16,0,0,0,0))
@@ -152,7 +174,7 @@ impl Renderer2d {
             texture_atlas,
             queue: vec![],
             pipeline,
-            color: sundile_graphics::Color::from_rgb(1.0, 1.0, 1.0),
+            color: Color::from_rgb(1.0, 1.0, 1.0),
             screen_size: [render_target.config.width, render_target.config.height],
 
             text_wrapper,
@@ -163,10 +185,33 @@ impl Renderer2d {
             ),
             font_size: 16.0,
             current_font: None,
+            current_layout: None,
         }
     }
 
-    pub fn render(&mut self, render_target: &mut RenderTarget) {
+    pub fn render(&mut self, render_target: &mut RenderTarget, assets: Arc<Mutex<AssetTypeMap>>) {
+        // Update any text assets.
+        let lock = assets.lock();
+        let assets = lock.unwrap();
+        if let Ok(textblocks) = assets.try_get_asset_map::<TextBlock>() {
+            textblocks.iter().for_each(|(_, value)| {
+                value.instance_cache.iter().for_each(|instance| {
+                    if let Some(font) = instance.font.as_ref() {
+                        self.set_font(font);
+                    }
+                    if let Some(layout) = instance.layout.as_ref() {
+                        self.set_text_layout(layout);
+                    }
+                    if instance.relative_position {
+                        self.draw_text_rel(value.data.clone(), instance.x, instance.y)
+                    } else {
+                        self.draw_text(value.data.clone(), instance.x, instance.y)
+                    }
+                })
+            })
+        }
+        drop(assets);
+
         // smoosh quads into batch
         let mut vertices: Vec<Vert2d> = vec![];
         let mut indices: Vec<u32> = vec![];
@@ -249,7 +294,7 @@ impl Renderer2d {
         self.text_wrapper.end_pass(render_target);
     }
 
-    pub fn set_color(&mut self, color: sundile_graphics::Color) {
+    pub fn set_color(&mut self, color: Color) {
         self.color = color;
     }
 
@@ -314,10 +359,15 @@ impl Renderer2d {
         self.text_bounds = (width, height);
     }
 
+    /// Sets text layout.
+    /// Seet wgpu_glyph::Layout
+    pub fn set_text_layout(&mut self, layout: &Layout<BuiltInLineBreaker>) {
+        self.current_layout = Some(layout.clone());
+    }
     /// Sets current font.
-    pub fn set_font(&mut self, font: &'static str, font_size: f32) {
-        self.current_font = Some(self.text_wrapper.font(font));
-        self.font_size = font_size;
+    pub fn set_font(&mut self, font: &FontSpecifier) {
+        self.current_font = Some(self.text_wrapper.font(&font.name));
+        self.font_size = font.size;
     }
 
     /// Draws text at the given pixel coordinates.
@@ -328,7 +378,16 @@ impl Renderer2d {
             bounds: self.text_bounds,
             color: self.color,
             font_size: self.font_size,
-            current_font: self.current_font,
+            current_font: self.current_font.unwrap_or(DEFAULT_FONT),
+            layout: self.current_layout.unwrap_or(DEFAULT_LAYOUT),
         });
+    }
+
+    pub fn draw_text_rel(&mut self, text: String, x: f32, y: f32) {
+        self.draw_text(
+            text,
+            x * self.screen_size[0] as f32,
+            y * self.screen_size[1] as f32,
+        );
     }
 }

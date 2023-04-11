@@ -9,15 +9,57 @@ use wgpu_glyph::*;
 pub struct Font {
     pub data: Vec<u8>,
 }
+#[derive(Debug)]
+pub struct FontSpecifier {
+    pub name: String,
+    pub size: f32,
+}
 
-pub struct TextWrapper {
+/// A string to be rendered.
+/// TODO: Add escapes for colors and font effects.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TextBlock {
+    pub data: String,
+    #[serde(skip)]
+    pub instance_cache: Vec<TextBlockInstance>,
+}
+impl TextBlock {
+    pub fn new(data: String) -> Self {
+        Self {
+            data,
+            instance_cache: vec![],
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TextBlockInstance {
+    pub x: f32,
+    pub y: f32,
+    pub relative_position: bool,
+    pub font: Option<FontSpecifier>,
+    pub layout: Option<Layout<BuiltInLineBreaker>>,
+}
+impl TextBlockInstance {
+    pub fn new(x: f32, y: f32, relative_position: bool) -> Self {
+        Self {
+            x,
+            y,
+            relative_position,
+            font: None,
+            layout: None,
+        }
+    }
+}
+
+pub struct GlyphRenderer {
     staging_belt: StagingBelt,
     brush: GlyphBrush<()>,
     fonts: HashMap<String, FontId>,
     submitted_already: bool,
 }
 
-impl TextWrapper {
+impl GlyphRenderer {
     pub fn new(render_target: &RenderTarget, raw_fonts: Option<HashMap<String, Font>>) -> Self {
         let staging_belt = StagingBelt::new(1024);
 
@@ -75,7 +117,7 @@ impl TextWrapper {
         self.brush.queue(section);
     }
 
-    pub fn font(&self, name: &'static str) -> FontId {
-        self.fonts[&name.to_string()]
+    pub fn font<'a>(&self, name: &String) -> FontId {
+        *self.fonts.get(name).unwrap()
     }
 }
