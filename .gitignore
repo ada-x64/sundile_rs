@@ -2,5 +2,7 @@
 !*/
 !*.rs
 !*Cargo*
+!*/assets/*
+!docs/*
 target/
 dbg/
