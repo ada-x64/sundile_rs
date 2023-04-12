@@ -1,10 +1,71 @@
 <!DOCTYPE html>
 <body>
   <script type="module">
+    import Engine from "./target.js";
     import init from "./target.js";
-    let res = await init();
-    document.append(
-      "<h1>It seems that something has gone wrong! Please open the console and report any errors.</h1>"
-    );
+
+    // Console hooks.
+
+    const Level = Object.freeze({
+      LOG: Symbol("log"),
+      WARN: Symbol("warn"),
+      ERROR: Symbol("error"),
+      DEBUG: Symbol("debug"),
+      INFO: Symbol("info"),
+    });
+    let log = [];
+    let mklog = (console_fn, level) => {
+      return (...args) => {
+        log.push({
+          timestamp: new Date().toLocaleString(),
+          level: Symbol.keyFor(level),
+          args: [...args],
+        });
+        let fn = console_fn;
+        fn(...args);
+      };
+    };
+
+    console.log = mklog(console.log, Level.LOG);
+    console.warn = mklog(console.warn, Level.WARN);
+    console.error = mklog(console.error, Level.ERROR);
+    console.debug = mklog(console.debug, Level.DEBUG);
+    console.info = mklog(console.info, Level.INFO);
+
+    document.querySelector(".troubleshooting").hidden = true;
+
+    try {
+      let res = await init();
+      Engine.run();
+    } catch (e) {
+      console.error(e);
+      document.querySelector(".troubleshooting").hidden = false;
+      document.querySelector(".logs").textContent = JSON.stringify(
+        log,
+        null,
+        "\t"
+      );
+      document.querySelector("canvas").remove();
+    }
   </script>
+  <div class="troubleshooting" style="display: hidden">
+    <h1>It seems something has gone wrong!</h1>
+    <p>
+      Please report any errors to
+      <a href="mailto:ada@cubething.dev">ada@cubething.dev</a>.
+    </p>
+    <p>Please copy and paste the contents below in the body of your email:</p>
+    <button
+      onclick="navigator.clipboard.writeText(document.querySelector('.logs').textContent);"
+    >
+      Copy Logs
+    </button>
+    <pre
+      style="
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 5px;
+        overflow: scroll;
+      "
+    ><code class="logs"></code></pre>
+  </div>
 </body>
