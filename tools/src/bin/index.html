@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <body>
-    <script type="module">
-        import init from './pkg/target.js';
-        let res = await init();
-        document.append("<h1>It seems that something has gone wrong! Please open the console and report any errors.</h1>");
-    </script>
+  <script type="module">
+    import init from "./target.js";
+    let res = await init();
+    document.append(
+      "<h1>It seems that something has gone wrong! Please open the console and report any errors.</h1>"
+    );
+  </script>
 </body>
