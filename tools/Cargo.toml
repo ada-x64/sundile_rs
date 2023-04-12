@@ -6,14 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = 'itch-pack'
-required-features = ['itch-pack']
+name = 'sundile_pack'
+required-features = ['sundile_pack']
 
 [features]
-default = ["itch-pack"]
-itch-pack = ["anyhow", "zip"]
+default = ["sundile_pack"]
+sundile_pack = ["thiserror", "zip", "clap"]
 
 [dependencies]
 # itch-pack
-anyhow = {version = "1.*", optional=true}
 zip = {version="0.6.0", optional=true}
+clap = { version = "4.2.1", optional = true, features = ["derive"] }
+thiserror = {workspace = true, optional = true}

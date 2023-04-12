@@ -4,5 +4,6 @@
 !*Cargo*
 !*/assets/*
 !docs/*
+!README.md
 target/
 dbg/
