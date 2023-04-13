@@ -7,14 +7,22 @@ edition = "2021"
 
 [[bin]]
 name = 'sundile_pack'
+path = 'pack/src/main.rs'
 required-features = ['sundile_pack']
 
+[[bin]]
+name = 'sundile_serialize_assets'
+path = 'serialize/src/main.rs'
+required-features = ['sundile_serialize_assets']
+
 [features]
-default = ["sundile_pack"]
+default = ["sundile_pack", "sundile_serialize_assets"]
 sundile_pack = ["thiserror", "zip", "clap"]
+sundile_serialize_assets = ["clap", "env_logger", "sundile_assets"]
 
 [dependencies]
-# itch-pack
 zip = {version="0.6.0", optional=true}
 clap = { version = "4.2.1", optional = true, features = ["derive"] }
 thiserror = {workspace = true, optional = true}
+env_logger = {version = "0.10.0", optional=true}
+sundile_assets = {path="../../sundile_rs/assets/", optional=true}
