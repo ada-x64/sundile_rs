@@ -1,6 +1,6 @@
 // internal modules
 pub mod builders;
-pub mod debug_gui;
+// pub mod debug_gui;
 
 // exports
 pub mod prelude {
@@ -18,11 +18,11 @@ pub mod prelude {
     pub use sundile_common::*;
 }
 
-use egui_winit::winit::event::VirtualKeyCode;
+// use egui_winit::winit::event::VirtualKeyCode;
 use log::*;
 pub use prelude::*;
 use wasm_bindgen::prelude::wasm_bindgen;
-use winit::window::*;
+use winit::{event::VirtualKeyCode, window::*};
 
 //NOTE: Because this is wasm_bindgen, it *cannot* have a lifetime or type parameter!
 #[wasm_bindgen]
@@ -32,23 +32,23 @@ pub struct Engine {
     render_target: RenderTarget,
     assets: AssetTypeMap,
     scene_map: SceneMap,
-    debug_gui: DebugGui,
+    // debug_gui: DebugGui,
 }
 #[wasm_bindgen]
 impl Engine {
     /// Runs the game.
     /// Note, this hands execution of the main thread over to winit, so make sure this is the last thing you call!
     pub fn run(self) {
-        let (event_loop, window, mut render_target, assets, scene_map, mut debug_gui) = (
+        let (event_loop, _window, mut render_target, assets, scene_map /*mut debug_gui*/) = (
             self.event_loop,
             self.window,
             self.render_target,
             self.assets,
             self.scene_map,
-            self.debug_gui,
+            // self.debug_gui,
         );
 
-        let mut game = Game::new(&render_target, assets, scene_map, None, debug_gui.open);
+        let mut game = Game::new(&render_target, assets, scene_map, None, false); //debug_gui.open);
         let mut fps = 0.0;
         let mut timer = time::Timer::new();
         let mut debug_timer = time::Timer::new();
@@ -56,47 +56,46 @@ impl Engine {
         debug_timer.start();
         let mut input = Input::new();
 
-        event_loop.run(
-            move |event, _, control_flow| match debug_gui.handle_event(event) {
-                Some(event) => {
-                    let can_update_game = input.update(&event);
-                    if !can_update_game {
-                        return;
-                    }
+        event_loop.run(move |event, _, control_flow| {
+            //match debug_gui.handle_event(event) {
+            // Some(event) => {
+            let can_update_game = input.update(&event);
+            if !can_update_game {
+                return;
+            }
 
-                    if input.key_pressed(VirtualKeyCode::F5) {
-                        debug_gui.open = !debug_gui.open;
-                        game.paused = debug_gui.open;
-                    }
-                    if input.key_pressed(VirtualKeyCode::Escape) {
-                        *control_flow = winit::event_loop::ControlFlow::Exit;
-                        warn!("Exiting");
-                    }
+            // if input.key_pressed(VirtualKeyCode::F5) {
+            //     debug_gui.open = !debug_gui.open;
+            //     game.paused = debug_gui.open;
+            // }
+            if input.key_pressed(VirtualKeyCode::Escape) {
+                *control_flow = winit::event_loop::ControlFlow::Exit;
+                warn!("Exiting");
+            }
 
-                    game.handle_input(&input);
+            game.handle_input(&input);
 
-                    let dt = timer.elapsed();
-                    timer.start();
+            let dt = timer.elapsed();
+            timer.start();
 
-                    let smoothing = 0.9;
-                    if dt.as_secs() != 0.0 {
-                        fps = fps * smoothing + (1.0 - smoothing) / (dt.as_secs());
-                    }
-                    game.update(dt);
+            let smoothing = 0.9;
+            if dt.as_secs() != 0.0 {
+                fps = fps * smoothing + (1.0 - smoothing) / (dt.as_secs());
+            }
+            game.update(dt);
 
-                    if debug_timer.elapsed() > one_second {
-                        info!("fps: {fps}");
-                    }
+            if debug_timer.elapsed() > one_second {
+                info!("fps: {fps}");
+            }
 
-                    render_target.begin_frame();
-                    game.render(&mut render_target);
-                    debug_gui.render(&mut render_target, &window, &mut game, fps);
-                    render_target.end_frame();
+            render_target.begin_frame();
+            game.render(&mut render_target);
+            // debug_gui.render(&mut render_target, &window, &mut game, fps);
+            render_target.end_frame();
 
-                    input.step();
-                }
-                None => {}
-            },
-        );
+            input.step();
+            // }
+            // None => {}
+        });
     }
 }

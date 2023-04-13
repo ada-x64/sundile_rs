@@ -1,18 +1,29 @@
 [package]
-name = "frontend"
+name = "sundile_examples"
 version = "0.1.0"
 edition = "2021"
 
-[[example]]
-name="basic"
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name="main"
+path="src/main.rs"
+
+[features]
+default = []
+basic = []
+model_import = ["cgmath"]
+text = []
 
 [dependencies]
 # local crates
 sundile = {path="../engine/"}
 
 # deps
-cgmath = "*"
+cgmath = {version = "0.18", optional=true}
 
 # workspace deps
 wgpu = {workspace = true}
 winit = {workspace = true}
+wasm-bindgen = {workspace = true}
