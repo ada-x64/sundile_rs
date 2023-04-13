@@ -1,5 +1,22 @@
 <!DOCTYPE html>
-<body>
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+    }
+    .troubleshooting {
+      display: none;
+    }
+    pre {
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 5px;
+      overflow: scroll;
+      max-height: 500px;
+      max-width: 250px;
+    }
+  </style>
   <script type="module">
     import Engine from "./target.js";
     import init from "./target.js";
@@ -52,6 +69,8 @@
       document.querySelector("canvas").remove();
     }
   </script>
+</head>
+<body>
   <div class="troubleshooting" style="display: none">
     <h1>It seems something has gone wrong!</h1>
     <p>
@@ -64,14 +83,6 @@
     >
       Copy Logs
     </button>
-    <pre
-      style="
-        background-color: rgba(0, 0, 0, 0.5);
-        border-radius: 5px;
-        overflow: scroll;
-        max-height: 500px;
-        max-width: 250px;
-      "
-    ><code class="logs"></code></pre>
+    <pre><code class="logs"></code></pre>
   </div>
 </body>

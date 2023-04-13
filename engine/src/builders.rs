@@ -28,7 +28,12 @@ impl<'a> EngineBuilder<'a> {
         #[cfg(target_arch = "wasm32")]
         {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::max()).expect("could not initialize logger");
+            let log_level = if cfg!(debug_assertions) {
+                log::Level::Debug
+            } else {
+                log::Level::Warn
+            };
+            console_log::init_with_level(log_level).expect("could not initialize logger");
         }
 
         Self {
@@ -107,6 +112,7 @@ impl<'a> EngineBuilder<'a> {
             .render_target_builder
             .unwrap_or(RenderTargetBuilder::new(None, false))
             .build(&window);
+
         let mut assets = self
             .asset_typemap_builder
             .unwrap_or(AssetTypeMapBuilder::new())
