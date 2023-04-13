@@ -12,8 +12,7 @@ use zip::{result::ZipError, ZipWriter};
     version,
     about,
     long_about = "
-sundile-pack is a command line tool for bundling WASM-compatible packages for the web. \
-It was originally designed for Sundile but should be usable elsewhere. \
+sundile-pack is a command line tool for bundling Sundile projects as web-compatible WASM. \
 In order for this to work, make sure you add the following to your Cargo.toml file:
           
 [lib]
@@ -33,7 +32,7 @@ tree ./pack-test
 
 main.rs:
 ```
-#[wasm_bindgen]
+#[wasm_bindgen(start)]
 pub fn main() {
     lib::doit();
 }
@@ -45,7 +44,7 @@ pub fn doit() {
     // actual application goes here
 }
 ```
-          "
+"
 )]
 struct Args {
     /// Directory of the crate to build.
