@@ -22,7 +22,10 @@ fn default_scene(b: SceneBuilder) {
     }
 }
 
-fn main() {
+/// NOTE: In order to run this example you will need to generate the precompiled assets.
+/// sundile_serialize_assets -i ./src/model_import/assets -o ./src/model_import -m
+#[allow(dead_code)]
+pub fn doit() {
     EngineBuilder::new()
         .with_window(WindowBuilder::new().with_title("Sundile"))
         .with_assets(

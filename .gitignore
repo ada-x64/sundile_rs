@@ -3,6 +3,8 @@
 !*.rs
 !*Cargo*
 !*/assets/*
+!.gitignore
 !docs/*
+!README.md
 target/
 dbg/

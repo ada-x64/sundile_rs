@@ -30,7 +30,8 @@ fn default_scene(b: SceneBuilder) {
     );
 }
 
-fn main() {
+#[allow(dead_code)]
+pub fn doit() {
     EngineBuilder::new()
         .with_window(WindowBuilder::new().with_title("Sundile"))
         .with_scenes(SceneMapBuilder::new().with_scene("default", default_scene))

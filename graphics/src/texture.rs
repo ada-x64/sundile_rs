@@ -10,6 +10,8 @@ pub const DEFAULT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormS
 pub enum TextureError {
     #[error("Failed to load texture! `{0}`")]
     Load(#[from] image::ImageError),
+    #[error("Due to threading constraints, JPEG and TIFF image formats are not supported for web builds!")]
+    WasmTextureExtension,
 }
 
 pub struct TextureWrapper {
@@ -33,7 +35,7 @@ impl TextureWrapper {
             || path_copy.ends_with(".jpeg")
             || path_copy.ends_with(".tiff")
         {
-            return Err(anyhow!("JPEG and TIFF are not supported for web builds!"));
+            return Err(TextureError::WasmTextureExtension);
         }
         let img = image::open(path).map_err(|e| TextureError::Load(e))?;
         Self::from_image(device, queue, &img, label, is_normal_map)
