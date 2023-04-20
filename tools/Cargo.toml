@@ -17,7 +17,7 @@ required-features = ['sundile_serialize_assets']
 
 [features]
 default = ["sundile_pack", "sundile_serialize_assets"]
-sundile_pack = ["thiserror", "zip", "clap"]
+sundile_pack = ["thiserror", "zip", "clap", "include_dir"]
 sundile_serialize_assets = ["clap", "env_logger", "sundile_assets"]
 
 [dependencies]
@@ -26,3 +26,4 @@ clap = { version = "4.2.1", optional = true, features = ["derive"] }
 thiserror = {workspace = true, optional = true}
 env_logger = {version = "0.10.0", optional=true}
 sundile_assets = {path="../../sundile_rs/assets/", optional=true}
+include_dir = { version = "0.7.3", optional = true }

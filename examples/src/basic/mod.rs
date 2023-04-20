@@ -1,9 +1,9 @@
 use sundile::WindowBuilder;
 
 #[allow(dead_code)]
-pub fn doit() {
+pub fn doit(window_builder: WindowBuilder) {
     let engine = sundile::EngineBuilder::new()
-        .with_window(WindowBuilder::new().with_title("Sundile"))
+        .with_window(window_builder.with_title("Sundile - Basic Example"))
         .build();
 
     engine.run();

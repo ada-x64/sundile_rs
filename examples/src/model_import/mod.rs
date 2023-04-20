@@ -5,6 +5,7 @@ use sundile::{
     AssetTypeMapBuilder, Deserializer, EngineBuilder, ModelInstance, SceneBuilder, SceneMapBuilder,
     WindowBuilder,
 };
+use winit::{platform::web::WindowBuilderExtWebSys, window::Fullscreen};
 
 fn default_scene(b: SceneBuilder) {
     for i in 0..10 {
@@ -25,9 +26,9 @@ fn default_scene(b: SceneBuilder) {
 /// NOTE: In order to run this example you will need to generate the precompiled assets.
 /// sundile_serialize_assets -i ./src/model_import/assets -o ./src/model_import -m
 #[allow(dead_code)]
-pub fn doit() {
+pub fn doit(window_builder: WindowBuilder) {
     EngineBuilder::new()
-        .with_window(WindowBuilder::new().with_title("Sundile"))
+        .with_window(window_builder.with_title("Sundile - Model Import Example"))
         .with_assets(
             AssetTypeMapBuilder::new()
                 .with_deserializer(Deserializer::default(), include_bytes!("data.bin")),
