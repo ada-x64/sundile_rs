@@ -26,4 +26,5 @@ cgmath = {version = "0.18", optional=true}
 # workspace deps
 wgpu = {workspace = true}
 winit = {workspace = true}
+web-sys = {workspace = true}
 wasm-bindgen = {workspace = true}

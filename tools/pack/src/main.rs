@@ -1,4 +1,5 @@
 use clap::Parser;
+use include_dir::*;
 use std::{
     fs::{read_dir, remove_file, File},
     io::{self, Read, Seek, Write},
@@ -18,8 +19,8 @@ In order for this to work, make sure you add the following to your Cargo.toml fi
 [lib]
 crate-type = [\"cdylib\", \"rlib\"]
           
-If you want web and native builds, you will need to create a library and a binary package. \
-An easy way to accomplish this is as follows:
+You will need an exposed wasm_main() function for this to work. \
+The example below goes over a simple binary and web build.
 
 tree ./pack-test
 ```
@@ -32,14 +33,18 @@ tree ./pack-test
 
 main.rs:
 ```
-#[wasm_bindgen(start)]
 pub fn main() {
-    lib::doit();
+    pack_test::doit();
 }
 ```
 
 lib.rs:
 ```
+#[wasm_bindgen(start)]
+pub fn wasm_main() {
+    doit();
+}
+
 pub fn doit() {
     // actual application goes here
 }
@@ -52,7 +57,7 @@ struct Args {
     target_directory: String,
     /// Directory to output the built package.
     /// This is relative to the target directory!
-    #[arg(long, short = 'o', default_value = "server/pkg")]
+    #[arg(long, short = 'o', default_value = "pkg")]
     out_dir: String,
 
     /// Create a development build. Enable debug info, and disable optimizations.
@@ -89,7 +94,9 @@ enum BuildError {
     Custom(String),
 }
 
-// Calls wasm-pack and adds the included index.html.
+static WEB_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/pack/src/web/");
+
+// Calls wasm-pack and adds the web interface.
 fn build<'a>(args: &Args) -> Result<(), BuildError> {
     let mut cmd = std::process::Command::new("wasm-pack");
     cmd.arg("build")
@@ -116,12 +123,18 @@ fn build<'a>(args: &Args) -> Result<(), BuildError> {
 
     match cmd.spawn()?.wait_with_output()?.status.success() {
         true => {
-            File::create(format!(
-                "{}/{}/index.html",
-                args.target_directory, args.out_dir
-            ))?
-            .write(include_bytes!("index.html"))?;
-
+            for file in WEB_DIR.files() {
+                File::create(format!(
+                    "{}/{}/{}",
+                    args.target_directory,
+                    args.out_dir,
+                    file.path()
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .expect("Unable to convert file name to utf-8!")
+                ))?
+                .write(file.contents())?;
+            }
             Ok(())
         }
         false => Err(BuildError::WasmBuild),

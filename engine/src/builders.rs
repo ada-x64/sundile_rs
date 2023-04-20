@@ -7,7 +7,15 @@ pub use sundile_common::*;
 use sundile_core::SceneFn;
 use sundile_core::SceneMap;
 pub use sundile_graphics::*;
+use thiserror::Error;
 pub use winit::{event_loop::EventLoop, window::WindowBuilder};
+
+#[derive(Debug, Error)]
+enum BuilderError {
+    #[cfg(target_arch = "wasm32")]
+    #[error("Failed to build canvas: {0}")]
+    Canvas(String),
+}
 
 /// Builder for the game engine.
 pub struct EngineBuilder<'a> {
@@ -28,7 +36,12 @@ impl<'a> EngineBuilder<'a> {
         #[cfg(target_arch = "wasm32")]
         {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::max()).expect("could not initialize logger");
+            let log_level = if cfg!(debug_assertions) {
+                log::Level::Debug
+            } else {
+                log::Level::Warn
+            };
+            console_log::init_with_level(log_level).expect("could not initialize logger");
         }
 
         Self {
@@ -95,18 +108,31 @@ impl<'a> EngineBuilder<'a> {
         #[cfg(target_arch = "wasm32")]
         {
             // Append the canvas to the document body.
+            // Looks for `#sundile-canvas-wrapper` or just lobs it on the body.
             use winit::platform::web::WindowExtWebSys;
-            let web_window = web_sys::window().unwrap();
-            let doc = web_window.document().unwrap();
-            let body = doc.body().unwrap();
-            body.append_child(&window.canvas()).unwrap();
-            debug!("Canvas created.");
+            web_sys::window()
+                .and_then(|win| win.document())
+                .ok_or(BuilderError::Canvas("Could not get Window".into()))
+                .and_then(|doc| {
+                    // Should never error. Only errors on invalid input.
+                    let body = doc.body().map(|body| web_sys::Element::from(body));
+                    doc.get_element_by_id("sundile-canvas-wrapper")
+                        .or(body)
+                        .ok_or(BuilderError::Canvas("Unable to get body!".into()))
+                })
+                .and_then(|element| {
+                    element
+                        .append_child(&window.canvas())
+                        .map_err(|_| BuilderError::Canvas("Unable to append canvas!".into()))
+                })
+                .expect("Failed to create canvas!");
         }
 
         let render_target = self
             .render_target_builder
             .unwrap_or(RenderTargetBuilder::new(None, false))
             .build(&window);
+
         let mut assets = self
             .asset_typemap_builder
             .unwrap_or(AssetTypeMapBuilder::new())
